@@ -45,13 +45,13 @@ public class SearchHitsProtoUtils {
         // boolean totalHitAsInt = params.paramAsBoolean(RestSearchAction.TOTAL_HITS_AS_INT_PARAM, false);
         boolean totalHitAsInt = false;
         if (totalHitAsInt) {
-            long total = hits.getTotalHits() == null ? -1 : hits.getTotalHits().value();
+            long total = hits.getTotalHits() == null ? -1 : hits.getTotalHits().value;
             totalBuilder.setDoubleValue(total);
         } else if (hits.getTotalHits() != null) {
             org.opensearch.protobufs.TotalHits.Builder totalHitsBuilder = org.opensearch.protobufs.TotalHits.newBuilder();
-            totalHitsBuilder.setValue(hits.getTotalHits().value());
+            totalHitsBuilder.setValue(hits.getTotalHits().value);
             totalHitsBuilder.setRelation(
-                hits.getTotalHits().relation() == TotalHits.Relation.EQUAL_TO
+                hits.getTotalHits().relation == TotalHits.Relation.EQUAL_TO
                     ? org.opensearch.protobufs.TotalHits.TotalHitsRelation.TOTAL_HITS_RELATION_EQ
                     : org.opensearch.protobufs.TotalHits.TotalHitsRelation.TOTAL_HITS_RELATION_GTE
             );

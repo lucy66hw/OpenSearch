@@ -20,7 +20,7 @@ import org.opensearch.protobufs.DeleteOperation;
 import org.opensearch.protobufs.IndexOperation;
 import org.opensearch.protobufs.UpdateOperation;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.transport.client.node.NodeClient;
+import org.opensearch.client.node.NodeClient;
 import org.junit.Before;
 
 import java.io.IOException;

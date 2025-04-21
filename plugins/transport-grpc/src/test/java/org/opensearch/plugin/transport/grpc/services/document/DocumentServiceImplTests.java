@@ -14,7 +14,7 @@ import org.opensearch.protobufs.BulkRequest;
 import org.opensearch.protobufs.BulkRequestBody;
 import org.opensearch.protobufs.IndexOperation;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.transport.client.node.NodeClient;
+import org.opensearch.client.node.NodeClient;
 import org.junit.Before;
 
 import java.io.IOException;

@@ -23,7 +23,7 @@ import org.opensearch.search.suggest.SuggestBuilder;
 import org.opensearch.search.suggest.term.TermSuggestionBuilder;
 import org.opensearch.search.suggest.term.TermSuggestionBuilder.SuggestMode;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.transport.client.Client;
+import org.opensearch.client.Client;
 
 import java.io.IOException;
 

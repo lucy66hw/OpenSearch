@@ -17,7 +17,7 @@ import org.opensearch.plugins.NetworkPlugin;
 import org.opensearch.telemetry.tracing.Tracer;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
-import org.opensearch.transport.client.Client;
+import org.opensearch.client.Client;
 import org.junit.Before;
 
 import java.util.List;

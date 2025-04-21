@@ -13,7 +13,7 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.plugin.transport.grpc.listeners.SearchRequestActionListener;
 import org.opensearch.plugin.transport.grpc.proto.request.search.SearchRequestProtoUtils;
 import org.opensearch.protobufs.services.SearchServiceGrpc;
-import org.opensearch.transport.client.Client;
+import org.opensearch.client.Client;
 
 import java.io.IOException;
 

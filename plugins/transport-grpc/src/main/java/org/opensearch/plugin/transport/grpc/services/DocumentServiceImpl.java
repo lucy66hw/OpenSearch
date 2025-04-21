@@ -13,7 +13,7 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.plugin.transport.grpc.listeners.BulkRequestActionListener;
 import org.opensearch.plugin.transport.grpc.proto.request.document.bulk.BulkRequestProtoUtils;
 import org.opensearch.protobufs.services.DocumentServiceGrpc;
-import org.opensearch.transport.client.Client;
+import org.opensearch.client.Client;
 
 import io.grpc.stub.StreamObserver;
 

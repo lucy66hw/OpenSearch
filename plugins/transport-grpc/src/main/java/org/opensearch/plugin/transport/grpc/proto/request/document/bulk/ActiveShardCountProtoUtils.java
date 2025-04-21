@@ -38,7 +38,7 @@ public class ActiveShardCountProtoUtils {
     public static ActiveShardCount parseProto(WaitForActiveShards waitForActiveShards) {
 
         switch (waitForActiveShards.getWaitForActiveShardsCase()) {
-            case WaitForActiveShards.WaitForActiveShardsCase.WAIT_FOR_ACTIVE_SHARD_OPTIONS:
+            case WAIT_FOR_ACTIVE_SHARD_OPTIONS:
                 switch (waitForActiveShards.getWaitForActiveShardOptions()) {
                     case WAIT_FOR_ACTIVE_SHARD_OPTIONS_UNSPECIFIED:
                         throw new UnsupportedOperationException("No mapping for WAIT_FOR_ACTIVE_SHARD_OPTIONS_UNSPECIFIED");
@@ -47,7 +47,7 @@ public class ActiveShardCountProtoUtils {
                     default:
                         return ActiveShardCount.DEFAULT;
                 }
-            case WaitForActiveShards.WaitForActiveShardsCase.INT32_VALUE:
+            case INT32_VALUE:
                 return ActiveShardCount.from(waitForActiveShards.getInt32Value());
             default:
                 return ActiveShardCount.DEFAULT;

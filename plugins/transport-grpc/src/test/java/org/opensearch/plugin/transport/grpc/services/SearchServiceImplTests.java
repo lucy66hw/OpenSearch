@@ -11,7 +11,7 @@ package org.opensearch.plugin.transport.grpc.services;
 import org.opensearch.protobufs.SearchRequest;
 import org.opensearch.protobufs.SearchRequestBody;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.transport.client.node.NodeClient;
+import org.opensearch.client.node.NodeClient;
 import org.junit.Before;
 
 import java.io.IOException;

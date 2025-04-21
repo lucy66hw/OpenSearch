@@ -45,10 +45,10 @@ public class FetchSourceContextProtoUtils {
         // Set up source context if source parameters are provided
         if (request.hasSource()) {
             switch (request.getSource().getSourceConfigParamCase()) {
-                case SourceConfigParam.SourceConfigParamCase.BOOL_VALUE:
+                case BOOL_VALUE:
                     fetchSource = request.getSource().getBoolValue();
                     break;
-                case SourceConfigParam.SourceConfigParamCase.STRING_ARRAY:
+                case STRING_ARRAY:
                     sourceIncludes = request.getSource().getStringArray().getStringArrayList().toArray(new String[0]);
                     break;
                 default:
