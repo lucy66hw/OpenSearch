@@ -254,6 +254,7 @@ public class Netty4GrpcServerTransport extends NetworkPlugin.AuxTransport {
     }
 
     private TransportAddress bindAddress(InetAddress hostAddress, PortsRange portRange) {
+        int maxInboundMessageSize = 104857600; // 100MB
         AtomicReference<Exception> lastException = new AtomicReference<>();
         AtomicReference<TransportAddress> addr = new AtomicReference<>();
 
@@ -264,6 +265,7 @@ public class Netty4GrpcServerTransport extends NetworkPlugin.AuxTransport {
                 final NettyServerBuilder serverBuilder = NettyServerBuilder.forAddress(address, InsecureServerCredentials.create())
                     .bossEventLoopGroup(eventLoopGroup)
                     .workerEventLoopGroup(eventLoopGroup)
+                    .maxInboundMessageSize(maxInboundMessageSize)
                     .channelType(NioServerSocketChannel.class)
                     .addService(new HealthStatusManager().getHealthService())
                     .addService(ProtoReflectionService.newInstance());
