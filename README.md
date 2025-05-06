@@ -34,7 +34,7 @@
 * [Admin Responsibilities](ADMINS.md)
 * [Testing](TESTING.md)
 * [Security](SECURITY.md)
-*
+
 
 ## Code of Conduct
 
