@@ -12,6 +12,7 @@ import com.google.protobuf.ByteString;
 import org.opensearch.action.DocWriteRequest;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.support.WriteRequest;
+import org.opensearch.client.node.NodeClient;
 import org.opensearch.plugin.transport.grpc.proto.request.document.bulk.BulkRequestProtoUtils;
 import org.opensearch.protobufs.BulkRequest;
 import org.opensearch.protobufs.BulkRequestBody;
@@ -20,7 +21,6 @@ import org.opensearch.protobufs.DeleteOperation;
 import org.opensearch.protobufs.IndexOperation;
 import org.opensearch.protobufs.UpdateOperation;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.client.node.NodeClient;
 import org.junit.Before;
 
 import java.io.IOException;

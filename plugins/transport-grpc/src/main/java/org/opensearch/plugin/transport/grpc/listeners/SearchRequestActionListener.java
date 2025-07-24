@@ -13,6 +13,7 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.plugin.transport.grpc.proto.response.search.SearchResponseProtoUtils;
+import org.opensearch.plugin.transport.grpc.spi.SearchGrpcListener;
 
 import java.io.IOException;
 
@@ -25,15 +26,27 @@ public class SearchRequestActionListener implements ActionListener<SearchRespons
     private static final Logger logger = LogManager.getLogger(SearchRequestActionListener.class);
 
     private final StreamObserver<org.opensearch.protobufs.SearchResponse> responseObserver;
+    private final org.opensearch.protobufs.SearchRequest request;
+    private final SearchGrpcListener searchGrpcListener;
+    private final long startTimeNanos;
 
     /**
      * Constructs a new SearchRequestActionListener.
      *
      * @param responseObserver the gRPC stream observer to send the search response to
+     * @param request  original protobuf {@link org.opensearch.protobufs.SearchRequest}
+     * @param searchGrpcListener  composite {@link SearchGrpcListener} that receives metrics callbacks
      */
-    public SearchRequestActionListener(StreamObserver<org.opensearch.protobufs.SearchResponse> responseObserver) {
+    public SearchRequestActionListener(
+        StreamObserver<org.opensearch.protobufs.SearchResponse> responseObserver,
+        org.opensearch.protobufs.SearchRequest request,
+        SearchGrpcListener searchGrpcListener
+    ) {
         super();
         this.responseObserver = responseObserver;
+        this.searchGrpcListener = searchGrpcListener;
+        this.request = request;
+        this.startTimeNanos = System.nanoTime();
     }
 
     @Override
@@ -41,6 +54,9 @@ public class SearchRequestActionListener implements ActionListener<SearchRespons
         // Search execution succeeded. Convert the opensearch internal response to protobuf
         try {
             org.opensearch.protobufs.SearchResponse protoResponse = SearchResponseProtoUtils.toProto(response);
+
+            final long latencyNanos = (System.nanoTime() - startTimeNanos);
+            searchGrpcListener.onResponse(request, protoResponse, latencyNanos);
             responseObserver.onNext(protoResponse);
             responseObserver.onCompleted();
         } catch (RuntimeException | IOException e) {
@@ -51,6 +67,12 @@ public class SearchRequestActionListener implements ActionListener<SearchRespons
     @Override
     public void onFailure(Exception e) {
         logger.error("SearchRequestActionListener failed to process search request:" + e.getMessage());
-        responseObserver.onError(e);
+        try {
+            searchGrpcListener.onError(request, e);
+        } catch (Exception listenerException) {
+            logger.error("Error in searchGrpcListener.onError", listenerException);
+        } finally {
+            responseObserver.onError(e);
+        }
     }
 }

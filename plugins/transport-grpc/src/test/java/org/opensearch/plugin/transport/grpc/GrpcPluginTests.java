@@ -8,6 +8,7 @@
 
 package org.opensearch.plugin.transport.grpc;
 
+import org.opensearch.client.Client;
 import org.opensearch.common.network.NetworkService;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
@@ -17,7 +18,6 @@ import org.opensearch.plugins.NetworkPlugin;
 import org.opensearch.telemetry.tracing.Tracer;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
-import org.opensearch.client.Client;
 import org.junit.Before;
 
 import java.util.List;

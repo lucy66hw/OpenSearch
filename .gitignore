@@ -7,6 +7,11 @@
 build-idea/
 out/
 
+# bazel and build server protocol files
+.bazelbsp/
+.bsp/
+.ijwb/
+
 # include shared intellij config
 !.idea/inspectionProfiles/Project_Default.xml
 !.idea/runConfigurations/Debug_OpenSearch.xml

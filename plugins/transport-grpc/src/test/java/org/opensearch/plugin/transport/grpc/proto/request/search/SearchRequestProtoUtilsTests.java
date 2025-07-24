@@ -10,6 +10,7 @@ package org.opensearch.plugin.transport.grpc.proto.request.search;
 
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchType;
+import org.opensearch.client.Client;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.common.Strings;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
@@ -23,7 +24,6 @@ import org.opensearch.search.suggest.SuggestBuilder;
 import org.opensearch.search.suggest.term.TermSuggestionBuilder;
 import org.opensearch.search.suggest.term.TermSuggestionBuilder.SuggestMode;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.client.Client;
 
 import java.io.IOException;
 

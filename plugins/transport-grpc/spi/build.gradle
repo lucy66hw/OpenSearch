@@ -1,0 +1,58 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * transport-grpc SPI  — interfaces for SearchGrpcObserver & DocumentGrpcObserver
+ */
+
+apply plugin: 'opensearch.build'
+apply plugin: 'opensearch.publish'
+
+base {
+    group        = 'org.opensearch.plugin'
+    archivesName = 'transport-grpc-spi'
+}
+
+dependencies {
+    api project(':server')
+    api "org.opensearch:protobufs:${versions.opensearch_protobufs}"
+    compileOnly "org.apache.logging.log4j:log4j-api:${versions.log4j}"
+    testImplementation project(':test:framework')
+}
+
+
+/* ── TEMP – UBER-ONLY REPO ──────────────────────────────────────────────
+ * Added so Buildkite can publish/consume SPI snapshots.
+ * Delete this block before upstreaming to the public OpenSearch repo.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+afterEvaluate {
+    publishing {
+        repositories {
+            maven {
+                name = 'uberArtifactoryPublishing'
+                url = findProperty('artifactoryUrl') ?:
+                      'https://artifacts.uberinternal.com/artifactory/libs-snapshot-local'
+                allowInsecureProtocol = false
+                credentials {
+                    username = ""  // Empty username for USSO token auth
+                    password = System.getenv("ARTIFACTS_USSO_TOKEN")
+                }
+                authentication {
+                    basic(BasicAuthentication)
+                }
+            }
+        }
+    }
+}
+
+/** Publishes the plugin to the internal Artifactory repo using USSO token. */
+task publishToArtifactory(type: PublishToMavenRepository) {
+    group = 'publishing'
+    description = 'Publishes the plugin to Artifactory using USSO token'
+    afterEvaluate {
+        publication = publishing.publications.nebula
+        repository = publishing.repositories.getByName('uberArtifactoryPublishing')
+    }
+}
+
+test.enabled = true

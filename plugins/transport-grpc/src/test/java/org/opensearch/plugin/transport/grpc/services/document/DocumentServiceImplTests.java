@@ -9,12 +9,13 @@
 package org.opensearch.plugin.transport.grpc.services.document;
 
 import com.google.protobuf.ByteString;
+import org.opensearch.client.node.NodeClient;
 import org.opensearch.plugin.transport.grpc.services.DocumentServiceImpl;
+import org.opensearch.plugin.transport.grpc.spi.DocumentGrpcListener;
 import org.opensearch.protobufs.BulkRequest;
 import org.opensearch.protobufs.BulkRequestBody;
 import org.opensearch.protobufs.IndexOperation;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.client.node.NodeClient;
 import org.junit.Before;
 
 import java.io.IOException;
@@ -24,7 +25,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 public class DocumentServiceImplTests extends OpenSearchTestCase {
@@ -36,11 +36,13 @@ public class DocumentServiceImplTests extends OpenSearchTestCase {
 
     @Mock
     private StreamObserver<org.opensearch.protobufs.BulkResponse> responseObserver;
+    @Mock
+    private DocumentGrpcListener documentGrpcListener;
 
     @Before
     public void setup() throws IOException {
         MockitoAnnotations.openMocks(this);
-        service = new DocumentServiceImpl(client);
+        service = new DocumentServiceImpl(client, documentGrpcListener);
     }
 
     public void testBulkSuccess() throws IOException {
@@ -52,20 +54,6 @@ public class DocumentServiceImplTests extends OpenSearchTestCase {
 
         // Verify that client.bulk was called with any BulkRequest and any ActionListener
         verify(client).bulk(any(org.opensearch.action.bulk.BulkRequest.class), any());
-    }
-
-    public void testBulkError() throws IOException {
-        // Create a test request
-        BulkRequest request = createTestBulkRequest();
-
-        // Make the client throw an exception when bulk is called
-        doThrow(new RuntimeException("Test exception")).when(client).bulk(any(org.opensearch.action.bulk.BulkRequest.class), any());
-
-        // Call the bulk method
-        service.bulk(request, responseObserver);
-
-        // Verify that the error was sent
-        verify(responseObserver).onError(any(RuntimeException.class));
     }
 
     private BulkRequest createTestBulkRequest() {

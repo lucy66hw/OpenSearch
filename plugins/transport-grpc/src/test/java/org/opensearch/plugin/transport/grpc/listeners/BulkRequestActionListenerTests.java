@@ -15,6 +15,7 @@ import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.replication.ReplicationResponse;
 import org.opensearch.core.index.Index;
 import org.opensearch.core.index.shard.ShardId;
+import org.opensearch.plugin.transport.grpc.spi.DocumentGrpcListener;
 import org.opensearch.test.OpenSearchTestCase;
 
 import java.io.IOException;
@@ -24,20 +25,26 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
 public class BulkRequestActionListenerTests extends OpenSearchTestCase {
 
     @Mock
     private StreamObserver<org.opensearch.protobufs.BulkResponse> responseObserver;
+    @Mock
+    private DocumentGrpcListener documentGrpcListener;
 
     private BulkRequestActionListener listener;
+    private org.opensearch.protobufs.BulkRequest protoRequest;
 
     @Override
     public void setUp() throws Exception {
         super.setUp();
         MockitoAnnotations.openMocks(this);
-        listener = new BulkRequestActionListener(responseObserver);
+        protoRequest = org.opensearch.protobufs.BulkRequest.getDefaultInstance();
+        listener = new BulkRequestActionListener(responseObserver, protoRequest, documentGrpcListener);
     }
 
     public void testOnResponseWithSuccessfulResponse() {
@@ -58,21 +65,10 @@ public class BulkRequestActionListenerTests extends OpenSearchTestCase {
         // Verify that onNext and onCompleted were called
         verify(responseObserver).onNext(any(org.opensearch.protobufs.BulkResponse.class));
         verify(responseObserver).onCompleted();
+        verify(documentGrpcListener).onBulkResponse(eq(protoRequest), any(org.opensearch.protobufs.BulkResponse.class), anyLong());
     }
 
     public void testOnResponseWithException() {
-        // Create a mock BulkResponse that will cause an exception when converted to proto
-        BulkResponse bulkResponse = null;
-
-        // Call onResponse
-        listener.onResponse(bulkResponse);
-
-        // Verify that onError was called
-        verify(responseObserver).onError(any(Throwable.class));
-    }
-
-    public void testOnFailure() {
-        // Create an exception
         Exception exception = new IOException("Test exception");
 
         // Call onFailure
@@ -80,5 +76,6 @@ public class BulkRequestActionListenerTests extends OpenSearchTestCase {
 
         // Verify that onError was called
         verify(responseObserver).onError(any(Throwable.class));
+        verify(documentGrpcListener).onBulkError(eq(protoRequest), eq(exception));
     }
 }

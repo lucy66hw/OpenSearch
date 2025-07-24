@@ -9,14 +9,14 @@
 package org.opensearch.plugin.transport.grpc.proto.request.document.bulk;
 
 import org.opensearch.action.bulk.BulkShardRequest;
+import org.opensearch.client.Requests;
+import org.opensearch.client.node.NodeClient;
 import org.opensearch.plugin.transport.grpc.proto.request.common.FetchSourceContextProtoUtils;
 import org.opensearch.plugin.transport.grpc.proto.request.common.RefreshProtoUtils;
 import org.opensearch.protobufs.BulkRequest;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.action.document.RestBulkAction;
 import org.opensearch.search.fetch.subphase.FetchSourceContext;
-import org.opensearch.client.Requests;
-import org.opensearch.client.node.NodeClient;
 
 /**
  * Handler for bulk requests in gRPC.

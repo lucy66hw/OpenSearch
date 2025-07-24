@@ -10,10 +10,11 @@ package org.opensearch.plugin.transport.grpc.services;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.client.Client;
 import org.opensearch.plugin.transport.grpc.listeners.SearchRequestActionListener;
 import org.opensearch.plugin.transport.grpc.proto.request.search.SearchRequestProtoUtils;
+import org.opensearch.plugin.transport.grpc.spi.SearchGrpcListener;
 import org.opensearch.protobufs.services.SearchServiceGrpc;
-import org.opensearch.client.Client;
 
 import java.io.IOException;
 
@@ -27,15 +28,17 @@ import io.grpc.stub.StreamObserver;
 public class SearchServiceImpl extends SearchServiceGrpc.SearchServiceImplBase {
     private static final Logger logger = LogManager.getLogger(SearchServiceImpl.class);
     private final Client client;
+    private final SearchGrpcListener searchGrpcListener;
 
     /**
      * Creates a new SearchServiceImpl.
      *
      * @param client: Client for executing actions on the local node
+     * @param searchGrpcListener  composite {@link SearchGrpcListener} for metrics
      */
-    public SearchServiceImpl(Client client) {
-
+    public SearchServiceImpl(Client client, SearchGrpcListener searchGrpcListener) {
         this.client = client;
+        this.searchGrpcListener = searchGrpcListener;
     }
 
     /**
@@ -51,8 +54,9 @@ public class SearchServiceImpl extends SearchServiceGrpc.SearchServiceImplBase {
     ) {
 
         try {
+            searchGrpcListener.onRequest(request);
             org.opensearch.action.search.SearchRequest searchRequest = SearchRequestProtoUtils.prepareRequest(request, client);
-            SearchRequestActionListener listener = new SearchRequestActionListener(responseObserver);
+            SearchRequestActionListener listener = new SearchRequestActionListener(responseObserver, request, searchGrpcListener);
             client.search(searchRequest, listener);
         } catch (RuntimeException | IOException e) {
             logger.error("SearchServiceImpl failed to process search request, request=" + request + ", error=" + e.getMessage());

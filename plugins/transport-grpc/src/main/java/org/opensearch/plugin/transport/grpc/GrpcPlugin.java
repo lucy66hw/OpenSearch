@@ -7,6 +7,9 @@
  */
 package org.opensearch.plugin.transport.grpc;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.network.NetworkService;
@@ -18,17 +21,23 @@ import org.opensearch.core.indices.breaker.CircuitBreakerService;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
+import org.opensearch.plugin.transport.grpc.proto.request.search.query.AbstractQueryBuilderProtoUtils;
+import org.opensearch.plugin.transport.grpc.proto.request.search.query.QueryBuilderProtoConverter;
+import org.opensearch.plugin.transport.grpc.proto.request.search.query.QueryBuilderProtoConverterRegistry;
 import org.opensearch.plugin.transport.grpc.services.DocumentServiceImpl;
 import org.opensearch.plugin.transport.grpc.services.SearchServiceImpl;
+import org.opensearch.plugin.transport.grpc.spi.DocumentGrpcListener;
+import org.opensearch.plugin.transport.grpc.spi.SearchGrpcListener;
+import org.opensearch.plugins.ExtensiblePlugin;
 import org.opensearch.plugins.NetworkPlugin;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.script.ScriptService;
 import org.opensearch.telemetry.tracing.Tracer;
 import org.opensearch.threadpool.ThreadPool;
-import org.opensearch.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -48,14 +57,51 @@ import static org.opensearch.plugin.transport.grpc.Netty4GrpcServerTransport.SET
 /**
  * Main class for the gRPC plugin.
  */
-public final class GrpcPlugin extends Plugin implements NetworkPlugin {
+public final class GrpcPlugin extends Plugin implements NetworkPlugin, ExtensiblePlugin {
 
     private Client client;
+    private static final Logger logger = LogManager.getLogger(GrpcPlugin.class);
+    private final List<QueryBuilderProtoConverter> queryConverters = new ArrayList<>();
+    private QueryBuilderProtoConverterRegistry queryRegistry;
+    private SearchGrpcListener.CompositeListener searchGrpcListener;
+    private DocumentGrpcListener.CompositeListener documentGrpcListener;
 
     /**
      * Creates a new GrpcPlugin instance.
      */
     public GrpcPlugin() {}
+
+    /**
+     * Loads extensions from other plugins.
+     * This method is called by the OpenSearch plugin system to load extensions from other plugins.
+     *
+     * @param loader The extension loader to use for loading extensions
+     */
+    @Override
+    public void loadExtensions(ExtensiblePlugin.ExtensionLoader loader) {
+        // Load query converters from other plugins
+        List<QueryBuilderProtoConverter> extensions = loader.loadExtensions(QueryBuilderProtoConverter.class);
+        if (extensions != null) {
+            queryConverters.addAll(extensions);
+        }
+
+        // Load gRPC listeners from other plugins
+        List<SearchGrpcListener> searchGrpcListeners = List.copyOf(loader.loadExtensions(SearchGrpcListener.class));
+        List<DocumentGrpcListener> documentGrpcListeners = List.copyOf(loader.loadExtensions(DocumentGrpcListener.class));
+
+        // Create the composite listeners
+        searchGrpcListener = new SearchGrpcListener.CompositeListener(searchGrpcListeners, logger);
+        documentGrpcListener = new DocumentGrpcListener.CompositeListener(documentGrpcListeners, logger);
+    }
+
+    /**
+     * Get the list of query converters, including those loaded from extensions.
+     *
+     * @return The list of query converters
+     */
+    public List<QueryBuilderProtoConverter> getQueryConverters() {
+        return Collections.unmodifiableList(queryConverters);
+    }
 
     /**
      * Provides auxiliary transports for the plugin.
@@ -68,6 +114,7 @@ public final class GrpcPlugin extends Plugin implements NetworkPlugin {
      * @param clusterSettings The cluster settings
      * @param tracer The tracer
      * @return A map of transport names to transport suppliers
+     * @throws IllegalStateException if queryRegistry is not initialized
      */
     @Override
     public Map<String, Supplier<AuxTransport>> getAuxTransports(
@@ -81,7 +128,15 @@ public final class GrpcPlugin extends Plugin implements NetworkPlugin {
         if (client == null) {
             throw new RuntimeException("client cannot be null");
         }
-        List<BindableService> grpcServices = registerGRPCServices(new DocumentServiceImpl(client), new SearchServiceImpl(client));
+
+        if (queryRegistry == null) {
+            throw new IllegalStateException("createComponents must be called before getAuxTransports to initialize the registry");
+        }
+
+        List<BindableService> grpcServices = registerGRPCServices(
+            new DocumentServiceImpl(client, documentGrpcListener),
+            new SearchServiceImpl(client, searchGrpcListener)
+        );
         return Collections.singletonMap(
             GRPC_TRANSPORT_SETTING_KEY,
             () -> new Netty4GrpcServerTransport(settings, grpcServices, networkService)
@@ -117,7 +172,7 @@ public final class GrpcPlugin extends Plugin implements NetworkPlugin {
 
     /**
      * Creates components used by the plugin.
-     * Stores the client for later use in creating gRPC services.
+     * Stores the client for later use in creating gRPC services, and the query registry which registers the types of supported GRPC Search queries.
      *
      * @param client The client
      * @param clusterService The cluster service
@@ -147,6 +202,17 @@ public final class GrpcPlugin extends Plugin implements NetworkPlugin {
         Supplier<RepositoriesService> repositoriesServiceSupplier
     ) {
         this.client = client;
+
+        // Create the registry
+        this.queryRegistry = new QueryBuilderProtoConverterRegistry();
+
+        // Register external converters
+        for (QueryBuilderProtoConverter converter : queryConverters) {
+            queryRegistry.registerConverter(converter);
+        }
+
+        // Set the registry in AbstractQueryBuilderProtoUtils
+        AbstractQueryBuilderProtoUtils.setRegistry(queryRegistry);
 
         return super.createComponents(
             client,
