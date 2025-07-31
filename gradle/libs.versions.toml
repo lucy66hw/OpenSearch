@@ -28,7 +28,7 @@ google_auth       = "1.29.0"
 tdigest           = "3.2"
 hdrhistogram      = "2.2.2"
 grpc              = "1.68.2"
-opensearch_protobufs = "0.5.0"
+opensearch_protobufs = "0.6.0"
 
 # when updating the JNA version, also update the version in buildSrc/build.gradle
 jna               = "5.13.0"

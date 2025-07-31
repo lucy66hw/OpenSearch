@@ -203,8 +203,8 @@ public class MultiMatchQueryBuilderProtoUtils {
         }
 
         // Process name
-        if (multiMatchQueryProto.hasName()) {
-            queryName = multiMatchQueryProto.getName();
+        if (multiMatchQueryProto.hasUnderscoreName()) {
+            queryName = multiMatchQueryProto.getUnderscoreName();
         }
 
         // Create the builder with all the extracted values

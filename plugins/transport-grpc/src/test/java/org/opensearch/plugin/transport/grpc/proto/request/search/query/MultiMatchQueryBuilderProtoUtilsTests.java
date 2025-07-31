@@ -77,7 +77,7 @@ public class MultiMatchQueryBuilderProtoUtilsTests extends OpenSearchTestCase {
             .setAutoGenerateSynonymsPhraseQuery(false)
             .setFuzzyTranspositions(false)
             .setBoost(2.0f)
-            .setName("test_query")
+            .setUnderscoreName("test_query")
             .build();
 
         // Convert to MultiMatchQueryBuilder
@@ -270,7 +270,7 @@ public class MultiMatchQueryBuilderProtoUtilsTests extends OpenSearchTestCase {
             .setAutoGenerateSynonymsPhraseQuery(false)
             .setFuzzyTranspositions(false)
             .setBoost(2.0f)
-            .setName("test_query")
+            .setUnderscoreName("test_query")
             .build();
 
         // 4. Convert the proto to a MultiMatchQueryBuilder

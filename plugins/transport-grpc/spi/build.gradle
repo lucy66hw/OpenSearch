@@ -19,7 +19,6 @@ dependencies {
     testImplementation project(':test:framework')
 }
 
-
 /* ── TEMP – UBER-ONLY REPO ──────────────────────────────────────────────
  * Added so Buildkite can publish/consume SPI snapshots.
  * Delete this block before upstreaming to the public OpenSearch repo.

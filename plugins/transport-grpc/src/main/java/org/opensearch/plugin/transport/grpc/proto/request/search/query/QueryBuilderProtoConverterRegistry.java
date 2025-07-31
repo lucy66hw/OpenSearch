@@ -59,6 +59,7 @@ public class QueryBuilderProtoConverterRegistry {
         registerConverter(new RegexpQueryBuilderProtoConverter());
         registerConverter(new WildcardQueryBuilderProtoConverter());
         registerConverter(new ExistsQueryBuilderProtoConverter());
+        registerConverter(new IdsQueryBuilderProtoConverter());
 
         logger.info("Registered {} built-in query converters", converters.size());
     }
