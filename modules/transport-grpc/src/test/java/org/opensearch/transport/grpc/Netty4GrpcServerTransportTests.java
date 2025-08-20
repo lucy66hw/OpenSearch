@@ -237,8 +237,7 @@ public class Netty4GrpcServerTransportTests extends OpenSearchTestCase {
             assertTrue("Executor should be a ForkJoinPool", executor instanceof ForkJoinPool);
 
             ForkJoinPool forkJoinPool = (ForkJoinPool) executor;
-            assertEquals("Default executor count should be 2x allocated processors",
-                expectedExecutorCount, forkJoinPool.getParallelism());
+            assertEquals("Default executor count should be 2x allocated processors", expectedExecutorCount, forkJoinPool.getParallelism());
 
             transport.stop();
         }
@@ -313,9 +312,7 @@ public class Netty4GrpcServerTransportTests extends OpenSearchTestCase {
             .put(Netty4GrpcServerTransport.SETTING_GRPC_WORKER_COUNT.getKey(), 0) // Invalid: should be >= 1
             .build();
 
-        expectThrows(IllegalArgumentException.class, () -> {
-            new Netty4GrpcServerTransport(invalidSettings, services, networkService);
-        });
+        expectThrows(IllegalArgumentException.class, () -> { new Netty4GrpcServerTransport(invalidSettings, services, networkService); });
     }
 
     public void testExecutorCountSettingsValidation() {
@@ -325,9 +322,7 @@ public class Netty4GrpcServerTransportTests extends OpenSearchTestCase {
             .put(Netty4GrpcServerTransport.SETTING_GRPC_EXECUTOR_COUNT.getKey(), 0) // Invalid: should be >= 1
             .build();
 
-        expectThrows(IllegalArgumentException.class, () -> {
-            new Netty4GrpcServerTransport(invalidSettings, services, networkService);
-        });
+        expectThrows(IllegalArgumentException.class, () -> { new Netty4GrpcServerTransport(invalidSettings, services, networkService); });
     }
 
     // Helper methods to access private fields using reflection

@@ -352,10 +352,20 @@ public class Netty4GrpcServerTransport extends AuxTransport {
     @Override
     protected void doClose() {
         if (bossEventLoopGroup != null) {
-            bossEventLoopGroup.close();
+            try {
+                bossEventLoopGroup.shutdownGracefully(0, 10, TimeUnit.SECONDS).await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.warn("Failed to shut down boss event loop group");
+            }
         }
         if (workerEventLoopGroup != null) {
-            workerEventLoopGroup.close();
+            try {
+                workerEventLoopGroup.shutdownGracefully(0, 10, TimeUnit.SECONDS).await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.warn("Failed to shut down worker event loop group");
+            }
         }
     }
 
