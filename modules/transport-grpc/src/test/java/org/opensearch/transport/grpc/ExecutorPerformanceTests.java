@@ -8,9 +8,13 @@
 
 package org.opensearch.transport.grpc;
 
+import org.opensearch.common.SuppressForbidden;
 import org.opensearch.common.network.NetworkService;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.test.OpenSearchTestCase;
+import org.opensearch.threadpool.TestThreadPool;
+import org.opensearch.threadpool.ThreadPool;
+import org.junit.After;
 import org.junit.Before;
 
 import java.lang.reflect.Field;
@@ -33,11 +37,18 @@ public class ExecutorPerformanceTests extends OpenSearchTestCase {
 
     private NetworkService networkService;
     private List<BindableService> services;
+    private ThreadPool threadPool;
 
     @Before
     public void setup() {
         networkService = new NetworkService(List.of());
         services = List.of();
+        threadPool = new TestThreadPool("test");
+    }
+
+    @After
+    public void cleanup() {
+        threadPool.shutdown();
     }
 
     public void testExecutorHandlesConcurrentTasks() throws InterruptedException {
@@ -47,7 +58,7 @@ public class ExecutorPerformanceTests extends OpenSearchTestCase {
             .put(Netty4GrpcServerTransport.SETTING_GRPC_EXECUTOR_COUNT.getKey(), 4)
             .build();
 
-        try (Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService)) {
+        try (Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService, threadPool)) {
             transport.start();
 
             ExecutorService executor = getGrpcExecutor(transport);
@@ -96,7 +107,7 @@ public class ExecutorPerformanceTests extends OpenSearchTestCase {
             .put(Netty4GrpcServerTransport.SETTING_GRPC_WORKER_COUNT.getKey(), 2)
             .build();
 
-        try (Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService)) {
+        try (Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService, threadPool)) {
             transport.start();
 
             ExecutorService executor = getGrpcExecutor(transport);
@@ -150,7 +161,7 @@ public class ExecutorPerformanceTests extends OpenSearchTestCase {
             .put(Netty4GrpcServerTransport.SETTING_GRPC_EXECUTOR_COUNT.getKey(), 4)
             .build();
 
-        try (Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService)) {
+        try (Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService, threadPool)) {
             transport.start();
 
             ExecutorService executor = getGrpcExecutor(transport);
@@ -202,7 +213,7 @@ public class ExecutorPerformanceTests extends OpenSearchTestCase {
             .put(Netty4GrpcServerTransport.SETTING_GRPC_EXECUTOR_COUNT.getKey(), 2)
             .build();
 
-        Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService);
+        Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService, threadPool);
         transport.start();
 
         ExecutorService executor = getGrpcExecutor(transport);
@@ -231,6 +242,7 @@ public class ExecutorPerformanceTests extends OpenSearchTestCase {
     }
 
     // Helper methods
+    @SuppressForbidden(reason = "test uses reflection to access private fields")
     private ExecutorService getGrpcExecutor(Netty4GrpcServerTransport transport) {
         try {
             Field field = Netty4GrpcServerTransport.class.getDeclaredField("grpcExecutor");
@@ -241,6 +253,7 @@ public class ExecutorPerformanceTests extends OpenSearchTestCase {
         }
     }
 
+    @SuppressForbidden(reason = "test uses reflection to access private fields")
     private EventLoopGroup getWorkerEventLoopGroup(Netty4GrpcServerTransport transport) {
         try {
             Field field = Netty4GrpcServerTransport.class.getDeclaredField("workerEventLoopGroup");

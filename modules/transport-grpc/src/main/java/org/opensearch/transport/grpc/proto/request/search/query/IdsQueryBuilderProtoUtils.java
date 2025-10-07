@@ -7,7 +7,6 @@
  */
 package org.opensearch.transport.grpc.proto.request.search.query;
 
-import org.opensearch.index.query.AbstractQueryBuilder;
 import org.opensearch.index.query.IdsQueryBuilder;
 import org.opensearch.protobufs.IdsQuery;
 
@@ -16,7 +15,7 @@ import org.opensearch.protobufs.IdsQuery;
  * This class provides methods to transform Protocol Buffer representations of ids queries
  * into their corresponding OpenSearch IdsQueryBuilder implementations for search operations.
  */
-public class IdsQueryBuilderProtoUtils {
+class IdsQueryBuilderProtoUtils {
 
     private IdsQueryBuilderProtoUtils() {
         // Utility class, no instances
@@ -31,23 +30,18 @@ public class IdsQueryBuilderProtoUtils {
      * @param idsQueryProto The Protocol Buffer IdsQuery object
      * @return A configured IdsQueryBuilder instance
      */
-    public static IdsQueryBuilder fromProto(IdsQuery idsQueryProto) {
-        String queryName = null;
-        float boost = AbstractQueryBuilder.DEFAULT_BOOST;
-
+    static IdsQueryBuilder fromProto(IdsQuery idsQueryProto) {
         // Create IdsQueryBuilder
         IdsQueryBuilder idsQuery = new IdsQueryBuilder();
 
-        // Process name
-        if (idsQueryProto.hasUnderscoreName()) {
-            queryName = idsQueryProto.getUnderscoreName();
-            idsQuery.queryName(queryName);
+        // Process name (only set when present)
+        if (idsQueryProto.hasXName()) {
+            idsQuery.queryName(idsQueryProto.getXName());
         }
 
-        // Process boost
+        // Process boost (only set when present)
         if (idsQueryProto.hasBoost()) {
-            boost = idsQueryProto.getBoost();
-            idsQuery.boost(boost);
+            idsQuery.boost(idsQueryProto.getBoost());
         }
 
         // Process values (ids)

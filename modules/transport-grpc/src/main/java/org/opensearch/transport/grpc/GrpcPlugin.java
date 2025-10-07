@@ -28,6 +28,8 @@ import org.opensearch.plugins.SecureAuxTransportSettingsProvider;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.script.ScriptService;
 import org.opensearch.telemetry.tracing.Tracer;
+import org.opensearch.threadpool.ExecutorBuilder;
+import org.opensearch.threadpool.FixedExecutorBuilder;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.AuxTransport;
 import org.opensearch.transport.grpc.proto.request.search.query.AbstractQueryBuilderProtoUtils;
@@ -69,6 +71,9 @@ import static org.opensearch.transport.grpc.ssl.SecureNetty4GrpcServerTransport.
 public final class GrpcPlugin extends Plugin implements NetworkPlugin, ExtensiblePlugin {
 
     private static final Logger logger = LogManager.getLogger(GrpcPlugin.class);
+
+    /** The name of the gRPC thread pool */
+    public static final String GRPC_THREAD_POOL_NAME = "grpc";
 
     private Client client;
     private final List<QueryBuilderProtoConverter> queryConverters = new ArrayList<>();
@@ -164,7 +169,7 @@ public final class GrpcPlugin extends Plugin implements NetworkPlugin, Extensibl
         );
         return Collections.singletonMap(
             GRPC_TRANSPORT_SETTING_KEY,
-            () -> new Netty4GrpcServerTransport(settings, grpcServices, networkService)
+            () -> new Netty4GrpcServerTransport(settings, grpcServices, networkService, threadPool)
         );
     }
 
@@ -207,7 +212,13 @@ public final class GrpcPlugin extends Plugin implements NetworkPlugin, Extensibl
         );
         return Collections.singletonMap(
             GRPC_SECURE_TRANSPORT_SETTING_KEY,
-            () -> new SecureNetty4GrpcServerTransport(settings, grpcServices, networkService, secureAuxTransportSettingsProvider)
+            () -> new SecureNetty4GrpcServerTransport(
+                settings,
+                grpcServices,
+                networkService,
+                threadPool,
+                secureAuxTransportSettingsProvider
+            )
         );
     }
 
@@ -242,6 +253,22 @@ public final class GrpcPlugin extends Plugin implements NetworkPlugin, Extensibl
             SETTING_GRPC_MAX_CONNECTION_AGE,
             SETTING_GRPC_MAX_CONNECTION_IDLE,
             SETTING_GRPC_KEEPALIVE_TIMEOUT
+        );
+    }
+
+    /**
+     * Returns the executor builders for this plugin's custom thread pools.
+     * Creates a dedicated thread pool for gRPC request processing that integrates
+     * with OpenSearch's thread pool monitoring and management system.
+     *
+     * @param settings the current settings
+     * @return executor builders for this plugin's custom thread pools
+     */
+    @Override
+    public List<ExecutorBuilder<?>> getExecutorBuilders(Settings settings) {
+        final int executorCount = SETTING_GRPC_EXECUTOR_COUNT.get(settings);
+        return List.of(
+            new FixedExecutorBuilder(settings, GRPC_THREAD_POOL_NAME, executorCount, 1000, "thread_pool." + GRPC_THREAD_POOL_NAME)
         );
     }
 
@@ -302,6 +329,10 @@ public final class GrpcPlugin extends Plugin implements NetworkPlugin, Extensibl
                 queryRegistry.registerConverter(converter);
             }
             logger.info("Successfully injected registry and registered all {} external converters", queryConverters.size());
+
+            // Update the registry on all converters (including built-in ones) so they can access external converters
+            queryRegistry.updateRegistryOnAllConverters();
+            logger.info("Updated registry on all converters to include external converters");
         } else {
             logger.info("No external QueryBuilderProtoConverter(s) to register");
         }

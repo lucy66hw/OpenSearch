@@ -13,6 +13,7 @@ import org.opensearch.index.query.MultiMatchQueryBuilder;
 import org.opensearch.index.query.Operator;
 import org.opensearch.index.search.MatchQuery;
 import org.opensearch.protobufs.MultiMatchQuery;
+import org.opensearch.transport.grpc.proto.request.search.OperatorProtoUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -22,7 +23,7 @@ import java.util.Map;
  * This class provides methods to transform Protocol Buffer representations of bool queries
  * into their corresponding OpenSearch MultiMatchQueryBuilder implementations for search operations.
  */
-public class MultiMatchQueryBuilderProtoUtils {
+class MultiMatchQueryBuilderProtoUtils {
 
     private MultiMatchQueryBuilderProtoUtils() {
         // Utility class, no instances
@@ -38,8 +39,7 @@ public class MultiMatchQueryBuilderProtoUtils {
      * @return A configured MultiMatchQueryBuilder instance
      * @throws IllegalArgumentException if the query is null or missing required fields
      */
-    public static MultiMatchQueryBuilder fromProto(MultiMatchQuery multiMatchQueryProto) {
-        // Initialize all variables at the beginning
+    static MultiMatchQueryBuilder fromProto(MultiMatchQuery multiMatchQueryProto) {
         Object value = multiMatchQueryProto.getQuery();
         Map<String, Float> fieldsBoosts = new HashMap<>();
         MultiMatchQueryBuilder.Type type = MultiMatchQueryBuilder.DEFAULT_TYPE;
@@ -53,7 +53,6 @@ public class MultiMatchQueryBuilderProtoUtils {
         String fuzzyRewrite = null;
         Float tieBreaker = null;
         Boolean lenient = null;
-        Float cutoffFrequency = null;
         MatchQuery.ZeroTermsQuery zeroTermsQuery = MultiMatchQueryBuilder.DEFAULT_ZERO_TERMS_QUERY;
         boolean autoGenerateSynonymsPhraseQuery = true;
         boolean fuzzyTranspositions = MultiMatchQueryBuilder.DEFAULT_FUZZY_TRANSPOSITIONS;
@@ -61,14 +60,12 @@ public class MultiMatchQueryBuilderProtoUtils {
         float boost = AbstractQueryBuilder.DEFAULT_BOOST;
         String queryName = null;
 
-        // Process fields
         if (multiMatchQueryProto.getFieldsCount() > 0) {
             for (String field : multiMatchQueryProto.getFieldsList()) {
                 fieldsBoosts.put(field, AbstractQueryBuilder.DEFAULT_BOOST);
             }
         }
 
-        // Process type
         if (multiMatchQueryProto.hasType()) {
             switch (multiMatchQueryProto.getType()) {
                 case TEXT_QUERY_TYPE_BEST_FIELDS:
@@ -94,83 +91,60 @@ public class MultiMatchQueryBuilderProtoUtils {
             }
         }
 
-        // Process analyzer
         if (multiMatchQueryProto.hasAnalyzer()) {
             analyzer = multiMatchQueryProto.getAnalyzer();
         }
 
-        // Process slop
+        if (multiMatchQueryProto.hasBoost()) {
+            boost = multiMatchQueryProto.getBoost();
+        }
+
         if (multiMatchQueryProto.hasSlop()) {
             slop = multiMatchQueryProto.getSlop();
         }
 
-        // Do not process fuzziness (deprecated but still supported)
-        /*
         if (multiMatchQueryProto.hasFuzziness()) {
-            if (multiMatchQueryProto.getFuzziness().hasStringValue()) {
-                fuzziness = Fuzziness.build(multiMatchQueryProto.getFuzziness().getStringValue());
-            } else if (multiMatchQueryProto.getFuzziness().hasInt32Value()) {
-                fuzziness = Fuzziness.build(multiMatchQueryProto.getFuzziness().getInt32Value());
+            org.opensearch.protobufs.Fuzziness fuzzinessProto = multiMatchQueryProto.getFuzziness();
+            if (fuzzinessProto.hasString()) {
+                fuzziness = Fuzziness.build(fuzzinessProto.getString());
+            } else if (fuzzinessProto.hasInt32()) {
+                fuzziness = Fuzziness.fromEdits(fuzzinessProto.getInt32());
             }
         }
-        */
 
-        // Process prefix_length
         if (multiMatchQueryProto.hasPrefixLength()) {
             prefixLength = multiMatchQueryProto.getPrefixLength();
         }
 
-        // Process max_expansions
         if (multiMatchQueryProto.hasMaxExpansions()) {
             maxExpansions = multiMatchQueryProto.getMaxExpansions();
         }
 
-        // Process operator
-        if (multiMatchQueryProto.hasOperator()) {
-            switch (multiMatchQueryProto.getOperator()) {
-                case OPERATOR_AND:
-                    operator = Operator.AND;
-                    break;
-                case OPERATOR_OR:
-                    operator = Operator.OR;
-                    break;
-                default:
-                    // Keep default
-            }
+        if (multiMatchQueryProto.hasOperator()
+            && multiMatchQueryProto.getOperator() != org.opensearch.protobufs.Operator.OPERATOR_UNSPECIFIED) {
+            operator = OperatorProtoUtils.fromEnum(multiMatchQueryProto.getOperator());
         }
 
-        // Process minimum_should_match
         if (multiMatchQueryProto.hasMinimumShouldMatch()) {
-            if (multiMatchQueryProto.getMinimumShouldMatch().hasStringValue()) {
-                minimumShouldMatch = multiMatchQueryProto.getMinimumShouldMatch().getStringValue();
-            } else if (multiMatchQueryProto.getMinimumShouldMatch().hasInt32Value()) {
-                minimumShouldMatch = String.valueOf(multiMatchQueryProto.getMinimumShouldMatch().getInt32Value());
+            if (multiMatchQueryProto.getMinimumShouldMatch().hasString()) {
+                minimumShouldMatch = multiMatchQueryProto.getMinimumShouldMatch().getString();
+            } else if (multiMatchQueryProto.getMinimumShouldMatch().hasInt32()) {
+                minimumShouldMatch = String.valueOf(multiMatchQueryProto.getMinimumShouldMatch().getInt32());
             }
         }
 
-        // Process fuzzy_rewrite
         if (multiMatchQueryProto.hasFuzzyRewrite()) {
             fuzzyRewrite = multiMatchQueryProto.getFuzzyRewrite();
         }
 
-        // Process tie_breaker
         if (multiMatchQueryProto.hasTieBreaker()) {
             tieBreaker = multiMatchQueryProto.getTieBreaker();
         }
 
-        // Process lenient
         if (multiMatchQueryProto.hasLenient()) {
             lenient = multiMatchQueryProto.getLenient();
         }
 
-        // Do not process cutoff_frequency, as it's deprecated
-        /*
-        if (multiMatchQueryProto.hasCutoffFrequency()) {
-            cutoffFrequency = multiMatchQueryProto.getCutoffFrequency();
-        }
-        */
-
-        // Process zero_terms_query
         if (multiMatchQueryProto.hasZeroTermsQuery()) {
             switch (multiMatchQueryProto.getZeroTermsQuery()) {
                 case ZERO_TERMS_QUERY_NONE:
@@ -187,57 +161,43 @@ public class MultiMatchQueryBuilderProtoUtils {
             }
         }
 
-        // Process auto_generate_synonyms_phrase_query
+        if (multiMatchQueryProto.hasXName()) {
+            queryName = multiMatchQueryProto.getXName();
+        }
+
         if (multiMatchQueryProto.hasAutoGenerateSynonymsPhraseQuery()) {
             autoGenerateSynonymsPhraseQuery = multiMatchQueryProto.getAutoGenerateSynonymsPhraseQuery();
         }
 
-        // Process fuzzy_transpositions
         if (multiMatchQueryProto.hasFuzzyTranspositions()) {
             fuzzyTranspositions = multiMatchQueryProto.getFuzzyTranspositions();
         }
 
-        // Process boost
-        if (multiMatchQueryProto.hasBoost()) {
-            boost = multiMatchQueryProto.getBoost();
+        if (slop != MultiMatchQueryBuilder.DEFAULT_PHRASE_SLOP && type == MultiMatchQueryBuilder.Type.BOOL_PREFIX) {
+            throw new IllegalArgumentException("slop not allowed for type [" + type + "]");
         }
 
-        // Process name
-        if (multiMatchQueryProto.hasUnderscoreName()) {
-            queryName = multiMatchQueryProto.getUnderscoreName();
-        }
-
-        // Create the builder with all the extracted values
-        MultiMatchQueryBuilder builder = new MultiMatchQueryBuilder(value, fieldsBoosts.keySet().toArray(new String[0])).fields(
-            fieldsBoosts
-        )
+        // Create the builder with all the extracted values - matching fromXContent exactly
+        MultiMatchQueryBuilder builder = new MultiMatchQueryBuilder(value).fields(fieldsBoosts)
             .type(type)
             .analyzer(analyzer)
-            .slop(slop)
-            .prefixLength(prefixLength)
-            .maxExpansions(maxExpansions)
-            .operator(operator)
-            .minimumShouldMatch(minimumShouldMatch)
+            .fuzziness(fuzziness)
             .fuzzyRewrite(fuzzyRewrite)
+            .maxExpansions(maxExpansions)
+            .minimumShouldMatch(minimumShouldMatch)
+            .operator(operator)
+            .prefixLength(prefixLength)
+            .slop(slop)
             .tieBreaker(tieBreaker)
+            .zeroTermsQuery(zeroTermsQuery)
             .autoGenerateSynonymsPhraseQuery(autoGenerateSynonymsPhraseQuery)
-            .fuzzyTranspositions(fuzzyTranspositions)
             .boost(boost)
-            .queryName(queryName);
-
-        // if (fuzziness != null) {
-        // builder.fuzziness(fuzziness);
-        // }
+            .queryName(queryName)
+            .fuzzyTranspositions(fuzzyTranspositions);
 
         if (lenient != null) {
             builder.lenient(lenient);
         }
-
-        // if (cutoffFrequency != null) {
-        // builder.cutoffFrequency(cutoffFrequency);
-        // }
-
-        builder.zeroTermsQuery(zeroTermsQuery);
 
         return builder;
     }
