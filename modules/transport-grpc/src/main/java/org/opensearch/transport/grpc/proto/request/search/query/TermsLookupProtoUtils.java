@@ -16,7 +16,7 @@ import org.opensearch.protobufs.TermsLookupField;
  * This class provides methods to transform Protocol Buffer representations of terms lookups
  * into their corresponding OpenSearch TermsLookup implementations for search operations.
  */
-public class TermsLookupProtoUtils {
+class TermsLookupProtoUtils {
 
     private TermsLookupProtoUtils() {
         // Utility class, no instances
@@ -29,7 +29,7 @@ public class TermsLookupProtoUtils {
      * @param termsLookupFieldProto The Protocol Buffer TermsLookupField object containing index, id, path, and optional routing/store values
      * @return A configured TermsLookup instance with the appropriate settings
      */
-    protected static TermsLookup parseTermsLookup(TermsLookupField termsLookupFieldProto) {
+    static TermsLookup parseTermsLookup(TermsLookupField termsLookupFieldProto) {
 
         String index = termsLookupFieldProto.getIndex();
         String id = termsLookupFieldProto.getId();

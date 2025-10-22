@@ -244,10 +244,10 @@ public class BulkRequestParserProtoUtilsTests extends OpenSearchTestCase {
             .build();
 
         BulkRequest request = BulkRequest.newBuilder()
-            .addRequestBody(indexBody)
-            .addRequestBody(createBody)
-            .addRequestBody(updateBody)
-            .addRequestBody(deleteBody)
+            .addBulkRequestBody(indexBody)
+            .addBulkRequestBody(createBody)
+            .addBulkRequestBody(updateBody)
+            .addBulkRequestBody(deleteBody)
             .build();
 
         DocWriteRequest<?>[] requests = BulkRequestParserProtoUtils.getDocWriteRequests(
@@ -290,7 +290,7 @@ public class BulkRequestParserProtoUtilsTests extends OpenSearchTestCase {
     public void testGetDocWriteRequestsWithInvalidOperation() {
         BulkRequestBody invalidBody = BulkRequestBody.newBuilder().build();
 
-        BulkRequest request = BulkRequest.newBuilder().addRequestBody(invalidBody).build();
+        BulkRequest request = BulkRequest.newBuilder().addBulkRequestBody(invalidBody).build();
 
         expectThrows(
             IllegalArgumentException.class,
@@ -629,7 +629,7 @@ public class BulkRequestParserProtoUtilsTests extends OpenSearchTestCase {
             .build();
 
         BulkRequest request = BulkRequest.newBuilder()
-            .addRequestBody(indexBody)
+            .addBulkRequestBody(indexBody)
             .setRouting("global-routing")
             .setPipeline("global-pipeline")
             .setRequireAlias(true)
