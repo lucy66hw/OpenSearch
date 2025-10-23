@@ -55,7 +55,7 @@ public class PollingIngestStats implements Writeable, ToXContentFragment {
         long totalDuplicateMessageSkippedCount = in.readLong();
 
         long pointerBasedLag = 0;
-        if (in.getVersion().onOrAfter(Version.V_3_4_0)) {
+        if (in.getVersion().onOrAfter(Version.V_3_3_0)) {
             pointerBasedLag = in.readLong();
         }
 
@@ -85,7 +85,7 @@ public class PollingIngestStats implements Writeable, ToXContentFragment {
         out.writeLong(consumerStats.totalPollerMessageDroppedCount);
         out.writeLong(consumerStats.totalDuplicateMessageSkippedCount);
 
-        if (out.getVersion().onOrAfter(Version.V_3_4_0)) {
+        if (out.getVersion().onOrAfter(Version.V_3_3_0)) {
             out.writeLong(consumerStats.pointerBasedLag);
         }
     }
