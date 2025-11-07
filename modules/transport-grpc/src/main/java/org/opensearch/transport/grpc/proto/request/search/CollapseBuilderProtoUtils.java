@@ -41,8 +41,7 @@ public class CollapseBuilderProtoUtils {
      * @return A configured CollapseBuilder instance
      * @throws IOException if there's an error during parsing or conversion
      */
-    protected static CollapseBuilder fromProto(FieldCollapse collapseProto, QueryBuilderProtoConverterRegistry registry)
-        throws IOException {
+    static CollapseBuilder fromProto(FieldCollapse collapseProto, QueryBuilderProtoConverterRegistry registry) throws IOException {
         CollapseBuilder collapseBuilder = new CollapseBuilder(collapseProto.getField());
 
         if (collapseProto.hasMaxConcurrentGroupSearches()) {

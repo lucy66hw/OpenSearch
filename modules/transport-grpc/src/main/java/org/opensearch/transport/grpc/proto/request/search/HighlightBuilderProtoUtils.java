@@ -39,6 +39,7 @@ class HighlightBuilderProtoUtils {
      * HighlightBuilder with the appropriate settings.
      *
      * @param highlightProto The Protocol Buffer Highlight to convert
+     * @param registry The registry for converting highlight queries
      * @return A configured HighlightBuilder instance
      * @throws IllegalArgumentException if highlightProto is null
      */
@@ -85,11 +86,9 @@ class HighlightBuilderProtoUtils {
             highlightBuilder.requireFieldMatch(highlightProto.getRequireFieldMatch());
         }
 
-        if (highlightProto.hasBoundaryScanner()) {
+        if (highlightProto.hasBoundaryScanner() && highlightProto.getBoundaryScanner() != BoundaryScanner.BOUNDARY_SCANNER_UNSPECIFIED) {
             HighlightBuilder.BoundaryScannerType boundaryScanner = parseBoundaryScanner(highlightProto.getBoundaryScanner());
-            if (boundaryScanner != null) {
-                highlightBuilder.boundaryScannerType(boundaryScanner);
-            }
+            highlightBuilder.boundaryScannerType(boundaryScanner);
         }
 
         if (highlightProto.hasBoundaryMaxScan()) {
@@ -172,6 +171,22 @@ class HighlightBuilderProtoUtils {
                     fieldBuilder.matchedFields(matchedFields);
                 }
 
+                if (fieldProto.getPreTagsCount() > 0) {
+                    String[] preTags = new String[fieldProto.getPreTagsCount()];
+                    for (int j = 0; j < fieldProto.getPreTagsCount(); j++) {
+                        preTags[j] = fieldProto.getPreTags(j);
+                    }
+                    fieldBuilder.preTags(preTags);
+                }
+
+                if (fieldProto.getPostTagsCount() > 0) {
+                    String[] postTags = new String[fieldProto.getPostTagsCount()];
+                    for (int j = 0; j < fieldProto.getPostTagsCount(); j++) {
+                        postTags[j] = fieldProto.getPostTags(j);
+                    }
+                    fieldBuilder.postTags(postTags);
+                }
+
                 if (fieldProto.hasType()) {
                     if (fieldProto.getType().hasBuiltin()
                         && fieldProto.getType().getBuiltin() != BuiltinHighlighterType.BUILTIN_HIGHLIGHTER_TYPE_UNSPECIFIED) {
@@ -189,11 +204,9 @@ class HighlightBuilderProtoUtils {
                     fieldBuilder.boundaryMaxScan(fieldProto.getBoundaryMaxScan());
                 }
 
-                if (fieldProto.hasBoundaryScanner()) {
+                if (fieldProto.hasBoundaryScanner() && fieldProto.getBoundaryScanner() != BoundaryScanner.BOUNDARY_SCANNER_UNSPECIFIED) {
                     HighlightBuilder.BoundaryScannerType boundaryScanner = parseBoundaryScanner(fieldProto.getBoundaryScanner());
-                    if (boundaryScanner != null) {
-                        fieldBuilder.boundaryScannerType(boundaryScanner);
-                    }
+                    fieldBuilder.boundaryScannerType(boundaryScanner);
                 }
 
                 if (fieldProto.hasBoundaryScannerLocale()) {
@@ -246,9 +259,6 @@ class HighlightBuilderProtoUtils {
      * Convert protobuf BoundaryScanner enum to OpenSearch BoundaryScannerType enum
      */
     private static HighlightBuilder.BoundaryScannerType parseBoundaryScanner(BoundaryScanner boundaryScanner) {
-        if (boundaryScanner == null) {
-            return null;
-        }
         switch (boundaryScanner) {
             case BOUNDARY_SCANNER_CHARS:
                 return HighlightBuilder.BoundaryScannerType.CHARS;
@@ -256,10 +266,8 @@ class HighlightBuilderProtoUtils {
                 return HighlightBuilder.BoundaryScannerType.WORD;
             case BOUNDARY_SCANNER_SENTENCE:
                 return HighlightBuilder.BoundaryScannerType.SENTENCE;
-            case BOUNDARY_SCANNER_UNSPECIFIED:
-            case UNRECOGNIZED:
             default:
-                return null; // use its default
+                throw new IllegalArgumentException("Unknown BoundaryScanner value: " + boundaryScanner);
         }
     }
 }

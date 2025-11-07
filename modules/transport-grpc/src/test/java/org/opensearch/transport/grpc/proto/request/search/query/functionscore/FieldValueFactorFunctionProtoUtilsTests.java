@@ -12,25 +12,12 @@ import org.opensearch.index.query.functionscore.FieldValueFactorFunctionBuilder;
 import org.opensearch.index.query.functionscore.ScoreFunctionBuilder;
 import org.opensearch.protobufs.FieldValueFactorModifier;
 import org.opensearch.protobufs.FieldValueFactorScoreFunction;
-import org.opensearch.protobufs.FunctionScoreContainer;
 import org.opensearch.test.OpenSearchTestCase;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.instanceOf;
 
-public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestCase {
-
-    private FieldValueFactorFunctionProtoConverter converter;
-
-    @Override
-    public void setUp() throws Exception {
-        super.setUp();
-        converter = new FieldValueFactorFunctionProtoConverter();
-    }
-
-    public void testGetHandledFunctionCase() {
-        assertEquals(FunctionScoreContainer.FunctionScoreContainerCase.FIELD_VALUE_FACTOR, converter.getHandledFunctionCase());
-    }
+public class FieldValueFactorFunctionProtoUtilsTests extends OpenSearchTestCase {
 
     public void testFromProtoWithValidFieldValueFactorFunction() {
         // Create a field value factor function
@@ -41,12 +28,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_LOG)
             .build();
 
-        FunctionScoreContainer container = FunctionScoreContainer.newBuilder()
-            .setFieldValueFactor(fieldValueFactor)
-            .setWeight(2.0f)
-            .build();
-
-        ScoreFunctionBuilder<?> result = converter.fromProto(container);
+        ScoreFunctionBuilder<?> result = FieldValueFactorFunctionProtoUtils.fromProto(fieldValueFactor);
 
         assertThat(result, instanceOf(FieldValueFactorFunctionBuilder.class));
         FieldValueFactorFunctionBuilder fieldValueFactorFunction = (FieldValueFactorFunctionBuilder) result;
@@ -57,9 +39,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
         // Create a minimal field value factor function (only field required)
         FieldValueFactorScoreFunction fieldValueFactor = FieldValueFactorScoreFunction.newBuilder().setField("score").build();
 
-        FunctionScoreContainer container = FunctionScoreContainer.newBuilder().setFieldValueFactor(fieldValueFactor).build();
-
-        ScoreFunctionBuilder<?> result = converter.fromProto(container);
+        ScoreFunctionBuilder<?> result = FieldValueFactorFunctionProtoUtils.fromProto(fieldValueFactor);
 
         assertThat(result, instanceOf(FieldValueFactorFunctionBuilder.class));
         FieldValueFactorFunctionBuilder fieldValueFactorFunction = (FieldValueFactorFunctionBuilder) result;
@@ -75,12 +55,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_SQRT)
             .build();
 
-        FunctionScoreContainer container = FunctionScoreContainer.newBuilder()
-            .setFieldValueFactor(fieldValueFactor)
-            .setWeight(1.5f)
-            .build();
-
-        ScoreFunctionBuilder<?> result = converter.fromProto(container);
+        ScoreFunctionBuilder<?> result = FieldValueFactorFunctionProtoUtils.fromProto(fieldValueFactor);
 
         assertThat(result, instanceOf(FieldValueFactorFunctionBuilder.class));
         FieldValueFactorFunctionBuilder fieldValueFactorFunction = (FieldValueFactorFunctionBuilder) result;
@@ -93,9 +68,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_LOG)
             .build();
 
-        FunctionScoreContainer logContainer = FunctionScoreContainer.newBuilder().setFieldValueFactor(logFunction).build();
-
-        ScoreFunctionBuilder<?> logResult = converter.fromProto(logContainer);
+        ScoreFunctionBuilder<?> logResult = FieldValueFactorFunctionProtoUtils.fromProto(logFunction);
         assertThat(logResult, instanceOf(FieldValueFactorFunctionBuilder.class));
 
         // Test LOG1P modifier
@@ -104,9 +77,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_LOG1P)
             .build();
 
-        FunctionScoreContainer log1pContainer = FunctionScoreContainer.newBuilder().setFieldValueFactor(log1pFunction).build();
-
-        ScoreFunctionBuilder<?> log1pResult = converter.fromProto(log1pContainer);
+        ScoreFunctionBuilder<?> log1pResult = FieldValueFactorFunctionProtoUtils.fromProto(log1pFunction);
         assertThat(log1pResult, instanceOf(FieldValueFactorFunctionBuilder.class));
 
         // Test LOG2P modifier
@@ -115,9 +86,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_LOG2P)
             .build();
 
-        FunctionScoreContainer log2pContainer = FunctionScoreContainer.newBuilder().setFieldValueFactor(log2pFunction).build();
-
-        ScoreFunctionBuilder<?> log2pResult = converter.fromProto(log2pContainer);
+        ScoreFunctionBuilder<?> log2pResult = FieldValueFactorFunctionProtoUtils.fromProto(log2pFunction);
         assertThat(log2pResult, instanceOf(FieldValueFactorFunctionBuilder.class));
 
         // Test LN modifier
@@ -126,9 +95,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_LN)
             .build();
 
-        FunctionScoreContainer lnContainer = FunctionScoreContainer.newBuilder().setFieldValueFactor(lnFunction).build();
-
-        ScoreFunctionBuilder<?> lnResult = converter.fromProto(lnContainer);
+        ScoreFunctionBuilder<?> lnResult = FieldValueFactorFunctionProtoUtils.fromProto(lnFunction);
         assertThat(lnResult, instanceOf(FieldValueFactorFunctionBuilder.class));
 
         // Test LN1P modifier
@@ -137,9 +104,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_LN1P)
             .build();
 
-        FunctionScoreContainer ln1pContainer = FunctionScoreContainer.newBuilder().setFieldValueFactor(ln1pFunction).build();
-
-        ScoreFunctionBuilder<?> ln1pResult = converter.fromProto(ln1pContainer);
+        ScoreFunctionBuilder<?> ln1pResult = FieldValueFactorFunctionProtoUtils.fromProto(ln1pFunction);
         assertThat(ln1pResult, instanceOf(FieldValueFactorFunctionBuilder.class));
 
         // Test LN2P modifier
@@ -148,9 +113,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_LN2P)
             .build();
 
-        FunctionScoreContainer ln2pContainer = FunctionScoreContainer.newBuilder().setFieldValueFactor(ln2pFunction).build();
-
-        ScoreFunctionBuilder<?> ln2pResult = converter.fromProto(ln2pContainer);
+        ScoreFunctionBuilder<?> ln2pResult = FieldValueFactorFunctionProtoUtils.fromProto(ln2pFunction);
         assertThat(ln2pResult, instanceOf(FieldValueFactorFunctionBuilder.class));
 
         // Test SQUARE modifier
@@ -159,9 +122,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_SQUARE)
             .build();
 
-        FunctionScoreContainer squareContainer = FunctionScoreContainer.newBuilder().setFieldValueFactor(squareFunction).build();
-
-        ScoreFunctionBuilder<?> squareResult = converter.fromProto(squareContainer);
+        ScoreFunctionBuilder<?> squareResult = FieldValueFactorFunctionProtoUtils.fromProto(squareFunction);
         assertThat(squareResult, instanceOf(FieldValueFactorFunctionBuilder.class));
 
         // Test SQRT modifier
@@ -170,9 +131,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_SQRT)
             .build();
 
-        FunctionScoreContainer sqrtContainer = FunctionScoreContainer.newBuilder().setFieldValueFactor(sqrtFunction).build();
-
-        ScoreFunctionBuilder<?> sqrtResult = converter.fromProto(sqrtContainer);
+        ScoreFunctionBuilder<?> sqrtResult = FieldValueFactorFunctionProtoUtils.fromProto(sqrtFunction);
         assertThat(sqrtResult, instanceOf(FieldValueFactorFunctionBuilder.class));
 
         // Test RECIPROCAL modifier
@@ -181,9 +140,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_RECIPROCAL)
             .build();
 
-        FunctionScoreContainer reciprocalContainer = FunctionScoreContainer.newBuilder().setFieldValueFactor(reciprocalFunction).build();
-
-        ScoreFunctionBuilder<?> reciprocalResult = converter.fromProto(reciprocalContainer);
+        ScoreFunctionBuilder<?> reciprocalResult = FieldValueFactorFunctionProtoUtils.fromProto(reciprocalFunction);
         assertThat(reciprocalResult, instanceOf(FieldValueFactorFunctionBuilder.class));
 
         // Test NONE modifier
@@ -192,43 +149,17 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setModifier(FieldValueFactorModifier.FIELD_VALUE_FACTOR_MODIFIER_NONE)
             .build();
 
-        FunctionScoreContainer noneContainer = FunctionScoreContainer.newBuilder().setFieldValueFactor(noneFunction).build();
-
-        ScoreFunctionBuilder<?> noneResult = converter.fromProto(noneContainer);
+        ScoreFunctionBuilder<?> noneResult = FieldValueFactorFunctionProtoUtils.fromProto(noneFunction);
         assertThat(noneResult, instanceOf(FieldValueFactorFunctionBuilder.class));
     }
 
-    public void testFromProtoWithNullContainer() {
-        IllegalArgumentException exception = expectThrows(IllegalArgumentException.class, () -> converter.fromProto(null));
+    public void testFromProtoWithNullFieldValueFactor() {
+        IllegalArgumentException exception = expectThrows(
+            IllegalArgumentException.class,
+            () -> FieldValueFactorFunctionProtoUtils.fromProto(null)
+        );
 
-        assertThat(exception.getMessage(), containsString("FunctionScoreContainer must contain a FieldValueFactorScoreFunction"));
-    }
-
-    public void testFromProtoWithWrongFunctionType() {
-        // Create a container with a different function type
-        FunctionScoreContainer container = FunctionScoreContainer.newBuilder()
-            .setWeight(1.0f) // Only weight, no specific function
-            .build();
-
-        IllegalArgumentException exception = expectThrows(IllegalArgumentException.class, () -> converter.fromProto(container));
-
-        assertThat(exception.getMessage(), containsString("FunctionScoreContainer must contain a FieldValueFactorScoreFunction"));
-    }
-
-    public void testFromProtoWithEmptyFieldName() {
-        // Create a field value factor function with empty field name
-        FieldValueFactorScoreFunction fieldValueFactor = FieldValueFactorScoreFunction.newBuilder()
-            .setField("") // Empty field name
-            .setFactor(1.0f)
-            .build();
-
-        FunctionScoreContainer container = FunctionScoreContainer.newBuilder().setFieldValueFactor(fieldValueFactor).build();
-
-        ScoreFunctionBuilder<?> result = converter.fromProto(container);
-
-        assertThat(result, instanceOf(FieldValueFactorFunctionBuilder.class));
-        FieldValueFactorFunctionBuilder fieldValueFactorFunction = (FieldValueFactorFunctionBuilder) result;
-
+        assertThat(exception.getMessage(), containsString("FieldValueFactorScoreFunction cannot be null"));
     }
 
     public void testFromProtoWithZeroFactor() {
@@ -238,9 +169,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setFactor(0.0f)
             .build();
 
-        FunctionScoreContainer container = FunctionScoreContainer.newBuilder().setFieldValueFactor(fieldValueFactor).build();
-
-        ScoreFunctionBuilder<?> result = converter.fromProto(container);
+        ScoreFunctionBuilder<?> result = FieldValueFactorFunctionProtoUtils.fromProto(fieldValueFactor);
 
         assertThat(result, instanceOf(FieldValueFactorFunctionBuilder.class));
         FieldValueFactorFunctionBuilder fieldValueFactorFunction = (FieldValueFactorFunctionBuilder) result;
@@ -253,9 +182,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setFactor(-1.5f)
             .build();
 
-        FunctionScoreContainer container = FunctionScoreContainer.newBuilder().setFieldValueFactor(fieldValueFactor).build();
-
-        ScoreFunctionBuilder<?> result = converter.fromProto(container);
+        ScoreFunctionBuilder<?> result = FieldValueFactorFunctionProtoUtils.fromProto(fieldValueFactor);
 
         assertThat(result, instanceOf(FieldValueFactorFunctionBuilder.class));
         FieldValueFactorFunctionBuilder fieldValueFactorFunction = (FieldValueFactorFunctionBuilder) result;
@@ -269,9 +196,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setMissing(0.0f)
             .build();
 
-        FunctionScoreContainer container = FunctionScoreContainer.newBuilder().setFieldValueFactor(fieldValueFactor).build();
-
-        ScoreFunctionBuilder<?> result = converter.fromProto(container);
+        ScoreFunctionBuilder<?> result = FieldValueFactorFunctionProtoUtils.fromProto(fieldValueFactor);
 
         assertThat(result, instanceOf(FieldValueFactorFunctionBuilder.class));
         FieldValueFactorFunctionBuilder fieldValueFactorFunction = (FieldValueFactorFunctionBuilder) result;
@@ -285,9 +210,7 @@ public class FieldValueFactorFunctionProtoConverterTests extends OpenSearchTestC
             .setMissing(-0.5f)
             .build();
 
-        FunctionScoreContainer container = FunctionScoreContainer.newBuilder().setFieldValueFactor(fieldValueFactor).build();
-
-        ScoreFunctionBuilder<?> result = converter.fromProto(container);
+        ScoreFunctionBuilder<?> result = FieldValueFactorFunctionProtoUtils.fromProto(fieldValueFactor);
 
         assertThat(result, instanceOf(FieldValueFactorFunctionBuilder.class));
         FieldValueFactorFunctionBuilder fieldValueFactorFunction = (FieldValueFactorFunctionBuilder) result;

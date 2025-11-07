@@ -19,7 +19,7 @@ import org.opensearch.protobufs.MatchPhrasePrefixQuery;
  * This class provides methods to transform Protocol Buffer representations of match_phrase_prefix queries
  * into their corresponding OpenSearch MatchPhrasePrefixQueryBuilder implementations for search operations.
  */
-class MatchPhrasePrefixQueryBuilderProtoUtils {
+public class MatchPhrasePrefixQueryBuilderProtoUtils {
 
     private MatchPhrasePrefixQueryBuilderProtoUtils() {
         // Utility class, no instances
@@ -36,7 +36,7 @@ class MatchPhrasePrefixQueryBuilderProtoUtils {
      * @return A configured MatchPhrasePrefixQueryBuilder instance
      * @throws IllegalArgumentException if the field name or value is null or empty
      */
-    static MatchPhrasePrefixQueryBuilder fromProto(MatchPhrasePrefixQuery matchPhrasePrefixQueryProto) {
+    protected static MatchPhrasePrefixQueryBuilder fromProto(MatchPhrasePrefixQuery matchPhrasePrefixQueryProto) {
         String fieldName = matchPhrasePrefixQueryProto.getField();
         Object value = matchPhrasePrefixQueryProto.getQuery();
         float boost = AbstractQueryBuilder.DEFAULT_BOOST;
