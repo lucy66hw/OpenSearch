@@ -29,32 +29,10 @@ import java.util.List;
  * This class provides methods to transform Protocol Buffer representations of function score queries
  * into their corresponding OpenSearch FunctionScoreQueryBuilder implementations for search operations.
  */
-public class FunctionScoreQueryBuilderProtoUtils {
-
-    // Registry for query conversion - injected by the gRPC plugin
-    private static QueryBuilderProtoConverterRegistry REGISTRY;
+class FunctionScoreQueryBuilderProtoUtils {
 
     private FunctionScoreQueryBuilderProtoUtils() {
         // Utility class, no instances
-    }
-
-    /**
-     * Sets the registry injected by the gRPC plugin.
-     * This method is called when the FunctionScore converter receives the populated registry.
-     *
-     * @param registry The registry to use
-     */
-    public static void setRegistry(QueryBuilderProtoConverterRegistry registry) {
-        REGISTRY = registry;
-    }
-
-    /**
-     * Gets the current registry.
-     *
-     * @return The current registry
-     */
-    static QueryBuilderProtoConverterRegistry getRegistry() {
-        return REGISTRY;
     }
 
     /**
@@ -65,10 +43,11 @@ public class FunctionScoreQueryBuilderProtoUtils {
      * max boost, min score, boost, and query name settings.
      *
      * @param functionScoreQueryProto The Protocol Buffer FunctionScoreQuery object
+     * @param registry The registry to use for converting nested queries
      * @return A configured FunctionScoreQueryBuilder instance
      * @throws IllegalArgumentException if the function score query is invalid or contains unsupported function types
      */
-    public static FunctionScoreQueryBuilder fromProto(FunctionScoreQuery functionScoreQueryProto) {
+    static FunctionScoreQueryBuilder fromProto(FunctionScoreQuery functionScoreQueryProto, QueryBuilderProtoConverterRegistry registry) {
         if (functionScoreQueryProto == null) {
             throw new IllegalArgumentException("FunctionScoreQuery cannot be null");
         }
@@ -86,12 +65,12 @@ public class FunctionScoreQueryBuilderProtoUtils {
 
         if (functionScoreQueryProto.hasQuery()) {
             QueryContainer queryContainer = functionScoreQueryProto.getQuery();
-            query = REGISTRY.fromProto(queryContainer);
+            query = registry.fromProto(queryContainer);
         }
 
         if (functionScoreQueryProto.getFunctionsCount() > 0) {
             for (FunctionScoreContainer container : functionScoreQueryProto.getFunctionsList()) {
-                FunctionScoreQueryBuilder.FilterFunctionBuilder filterFunctionBuilder = parseFunctionScoreContainer(container);
+                FunctionScoreQueryBuilder.FilterFunctionBuilder filterFunctionBuilder = parseFunctionScoreContainer(container, registry);
                 filterFunctionBuilders.add(filterFunctionBuilder);
             }
         }
@@ -105,11 +84,13 @@ public class FunctionScoreQueryBuilderProtoUtils {
             filterFunctionBuilders.toArray(new FunctionScoreQueryBuilder.FilterFunctionBuilder[0])
         );
 
-        if (functionScoreQueryProto.hasBoostMode()) {
+        if (functionScoreQueryProto.hasBoostMode()
+            && functionScoreQueryProto.getBoostMode() != FunctionBoostMode.FUNCTION_BOOST_MODE_UNSPECIFIED) {
             combineFunction = parseBoostMode(functionScoreQueryProto.getBoostMode());
         }
 
-        if (functionScoreQueryProto.hasScoreMode()) {
+        if (functionScoreQueryProto.hasScoreMode()
+            && functionScoreQueryProto.getScoreMode() != FunctionScoreMode.FUNCTION_SCORE_MODE_UNSPECIFIED) {
             scoreMode = parseScoreMode(functionScoreQueryProto.getScoreMode());
         }
 
@@ -148,7 +129,10 @@ public class FunctionScoreQueryBuilderProtoUtils {
     /**
      * Parses a FunctionScoreContainer and creates the appropriate FilterFunctionBuilder.
      */
-    private static FunctionScoreQueryBuilder.FilterFunctionBuilder parseFunctionScoreContainer(FunctionScoreContainer container) {
+    private static FunctionScoreQueryBuilder.FilterFunctionBuilder parseFunctionScoreContainer(
+        FunctionScoreContainer container,
+        QueryBuilderProtoConverterRegistry registry
+    ) {
         if (container == null) {
             throw new IllegalArgumentException("FunctionScoreContainer cannot be null");
         }
@@ -158,16 +142,13 @@ public class FunctionScoreQueryBuilderProtoUtils {
         Float functionWeight = null;
         if (container.hasFilter()) {
             QueryContainer filterContainer = container.getFilter();
-            filter = REGISTRY.fromProto(filterContainer);
+            filter = registry.fromProto(filterContainer);
         }
 
-        // Check for weight (only set if present, otherwise use default)
         if (container.hasWeight()) {
             functionWeight = container.getWeight();
         }
 
-        // Parse the function score container directly
-        // If there's no function type but there's a weight, create a WeightBuilder
         if (container.getFunctionScoreContainerCase() == FunctionScoreContainer.FunctionScoreContainerCase.FUNCTIONSCORECONTAINER_NOT_SET) {
             scoreFunction = null;
         } else {
@@ -199,66 +180,52 @@ public class FunctionScoreQueryBuilderProtoUtils {
 
         FunctionScoreContainer.FunctionScoreContainerCase functionCase = container.getFunctionScoreContainerCase();
 
-        switch (functionCase) {
-            case FIELD_VALUE_FACTOR:
-                return new FieldValueFactorFunctionProtoConverter().fromProto(container);
-            case RANDOM_SCORE:
-                return new RandomScoreFunctionProtoConverter().fromProto(container);
-            case SCRIPT_SCORE:
-                return new ScriptScoreFunctionProtoConverter().fromProto(container);
-            case EXP:
-                return new ExpDecayFunctionProtoConverter().fromProto(container);
-            case GAUSS:
-                return new GaussDecayFunctionProtoConverter().fromProto(container);
-            case LINEAR:
-                return new LinearDecayFunctionProtoConverter().fromProto(container);
-            default:
-                throw new IllegalArgumentException("Unsupported function score type: " + functionCase);
-        }
+        return switch (functionCase) {
+            case FIELD_VALUE_FACTOR -> FieldValueFactorFunctionProtoUtils.fromProto(container.getFieldValueFactor());
+            case RANDOM_SCORE -> RandomScoreFunctionProtoUtils.fromProto(container.getRandomScore());
+            case SCRIPT_SCORE -> ScriptScoreFunctionProtoUtils.fromProto(container.getScriptScore());
+            case EXP -> ExpDecayFunctionProtoUtils.fromProto(container.getExp());
+            case GAUSS -> GaussDecayFunctionProtoUtils.fromProto(container.getGauss());
+            case LINEAR -> LinearDecayFunctionProtoUtils.fromProto(container.getLinear());
+            default -> throw new IllegalArgumentException("Unsupported function score type: " + functionCase);
+        };
     }
 
     /**
-     * Parses a FunctionBoostMode enum to CombineFunction.
+     * Parses a FunctionBoostMode enum to CombineFunction.     *
+     * @param boostMode the FunctionBoostMode to parse
+     * @return the corresponding CombineFunction
+     * @throws IllegalArgumentException if the boostMode is unknown or unsupported
      */
     private static CombineFunction parseBoostMode(FunctionBoostMode boostMode) {
-        switch (boostMode) {
-            case FUNCTION_BOOST_MODE_AVG:
-                return CombineFunction.AVG;
-            case FUNCTION_BOOST_MODE_MAX:
-                return CombineFunction.MAX;
-            case FUNCTION_BOOST_MODE_MIN:
-                return CombineFunction.MIN;
-            case FUNCTION_BOOST_MODE_MULTIPLY:
-                return CombineFunction.MULTIPLY;
-            case FUNCTION_BOOST_MODE_REPLACE:
-                return CombineFunction.REPLACE;
-            case FUNCTION_BOOST_MODE_SUM:
-                return CombineFunction.SUM;
-            default:
-                return FunctionScoreQueryBuilder.DEFAULT_BOOST_MODE;
-        }
+        return switch (boostMode) {
+            case FUNCTION_BOOST_MODE_AVG -> CombineFunction.AVG;
+            case FUNCTION_BOOST_MODE_MAX -> CombineFunction.MAX;
+            case FUNCTION_BOOST_MODE_MIN -> CombineFunction.MIN;
+            case FUNCTION_BOOST_MODE_MULTIPLY -> CombineFunction.MULTIPLY;
+            case FUNCTION_BOOST_MODE_REPLACE -> CombineFunction.REPLACE;
+            case FUNCTION_BOOST_MODE_SUM -> CombineFunction.SUM;
+            default -> throw new IllegalArgumentException("Unsupported boost mode: " + boostMode);
+        };
     }
 
     /**
-     * Parses a FunctionScoreMode enum to FunctionScoreQuery.ScoreMode.
+     * Parses a FunctionScoreMode enum to ScoreMode.
+     *
+     * @param scoreMode the FunctionScoreMode to parse
+     * @return the corresponding FunctionScoreQuery.ScoreMode
+     * @throws IllegalArgumentException if the scoreMode is unknown or unsupported
      */
     private static org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode parseScoreMode(FunctionScoreMode scoreMode) {
-        switch (scoreMode) {
-            case FUNCTION_SCORE_MODE_AVG:
-                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.AVG;
-            case FUNCTION_SCORE_MODE_FIRST:
-                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.FIRST;
-            case FUNCTION_SCORE_MODE_MAX:
-                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MAX;
-            case FUNCTION_SCORE_MODE_MIN:
-                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MIN;
-            case FUNCTION_SCORE_MODE_MULTIPLY:
-                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MULTIPLY;
-            case FUNCTION_SCORE_MODE_SUM:
-                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.SUM;
-            default:
-                return FunctionScoreQueryBuilder.DEFAULT_SCORE_MODE;
-        }
+        return switch (scoreMode) {
+            case FUNCTION_SCORE_MODE_AVG -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.AVG;
+            case FUNCTION_SCORE_MODE_FIRST -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.FIRST;
+            case FUNCTION_SCORE_MODE_MAX -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MAX;
+            case FUNCTION_SCORE_MODE_MIN -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MIN;
+            case FUNCTION_SCORE_MODE_MULTIPLY -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MULTIPLY;
+            case FUNCTION_SCORE_MODE_SUM -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.SUM;
+            default -> throw new IllegalArgumentException("Unsupported score mode: " + scoreMode);
+        };
     }
 
 }

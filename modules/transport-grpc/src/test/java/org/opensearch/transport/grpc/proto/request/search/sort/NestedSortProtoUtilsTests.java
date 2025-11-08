@@ -40,24 +40,29 @@ public class NestedSortProtoUtilsTests extends OpenSearchTestCase {
         assertNull(result.getNestedSort());
     }
 
-    public void testFromProto_WithMaxChildren() {
-        NestedSortValue.Builder nestedSortValueBuilder = NestedSortValue.newBuilder().setPath("nested.field").setMaxChildren(10);
+    public void testFromProto() {
+        TermQuery termQuery = TermQuery.newBuilder()
+            .setField("status")
+            .setValue(org.opensearch.protobufs.FieldValue.newBuilder().setString("active").build())
+            .build();
 
-        NestedSortBuilder result = NestedSortProtoUtils.fromProto(nestedSortValueBuilder.build(), registry);
+        QueryContainer queryContainer = QueryContainer.newBuilder().setTerm(termQuery).build();
 
-        assertEquals("nested.field", result.getPath());
-        assertEquals(10, result.getMaxChildren());
-    }
-
-    public void testFromProto_WithNestedSort() {
         NestedSortValue innerNested = NestedSortValue.newBuilder().setPath("inner.nested").setMaxChildren(5).build();
 
-        NestedSortValue.Builder nestedSortValueBuilder = NestedSortValue.newBuilder().setPath("outer.nested").setNested(innerNested);
+        NestedSortValue nestedSortValue = NestedSortValue.newBuilder()
+            .setPath("outer.nested")
+            .setFilter(queryContainer)
+            .setMaxChildren(10)
+            .setNested(innerNested)
+            .build();
 
-        NestedSortBuilder result = NestedSortProtoUtils.fromProto(nestedSortValueBuilder.build(), registry);
+        NestedSortBuilder result = NestedSortProtoUtils.fromProto(nestedSortValue, registry);
 
         assertEquals("outer.nested", result.getPath());
-        assertNotNull(result.getNestedSort());
+        assertNotNull("Filter should not be null", result.getFilter());
+        assertEquals(10, result.getMaxChildren());
+        assertNotNull("Nested sort should not be null", result.getNestedSort());
         assertEquals("inner.nested", result.getNestedSort().getPath());
         assertEquals(5, result.getNestedSort().getMaxChildren());
     }
@@ -81,7 +86,6 @@ public class NestedSortProtoUtilsTests extends OpenSearchTestCase {
 
     public void testFromProto_NullPath() {
         NestedSortValue.Builder nestedSortValueBuilder = NestedSortValue.newBuilder();
-        // Don't set path, should result in empty string
 
         IllegalArgumentException exception = expectThrows(IllegalArgumentException.class, () -> {
             NestedSortProtoUtils.fromProto(nestedSortValueBuilder.build(), registry);
@@ -89,8 +93,7 @@ public class NestedSortProtoUtilsTests extends OpenSearchTestCase {
         assertEquals("Path is required for nested sort", exception.getMessage());
     }
 
-    public void testFromProto_WithFilter() {
-        // Create a simple term query as filter
+    public void testFromProto_WithNullRegistry() {
         TermQuery termQuery = TermQuery.newBuilder()
             .setField("status")
             .setValue(org.opensearch.protobufs.FieldValue.newBuilder().setString("active").build())
@@ -100,11 +103,25 @@ public class NestedSortProtoUtilsTests extends OpenSearchTestCase {
 
         NestedSortValue.Builder nestedSortValueBuilder = NestedSortValue.newBuilder().setPath("nested.field").setFilter(queryContainer);
 
-        NestedSortBuilder result = NestedSortProtoUtils.fromProto(nestedSortValueBuilder.build(), registry);
+        IllegalStateException exception = expectThrows(
+            IllegalStateException.class,
+            () -> NestedSortProtoUtils.fromProto(nestedSortValueBuilder.build(), null)
+        );
+        assertEquals("QueryBuilderProtoConverterRegistry cannot be null.", exception.getMessage());
+    }
 
-        assertEquals("nested.field", result.getPath());
-        assertNotNull(result.getFilter());
-        // Note: The actual filter conversion depends on the query converter registry being properly set up
-        // In a real test environment, you would verify the specific filter type and parameters
+    public void testFromProto_WithInvalidFilter() {
+        QueryContainer invalidQueryContainer = QueryContainer.newBuilder().build();
+
+        NestedSortValue nestedSortValue = NestedSortValue.newBuilder().setPath("nested.field").setFilter(invalidQueryContainer).build();
+
+        IllegalArgumentException exception = expectThrows(
+            IllegalArgumentException.class,
+            () -> NestedSortProtoUtils.fromProto(nestedSortValue, registry)
+        );
+        assertTrue(
+            "Exception message should mention 'Failed to convert nested sort filter'",
+            exception.getMessage().contains("Failed to convert nested sort filter")
+        );
     }
 }

@@ -24,7 +24,6 @@ public class CollapseBuilderProtoUtilsTests extends OpenSearchTestCase {
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        // Set up the registry with all built-in converters
         registry = new QueryBuilderProtoConverterRegistryImpl();
     }
 

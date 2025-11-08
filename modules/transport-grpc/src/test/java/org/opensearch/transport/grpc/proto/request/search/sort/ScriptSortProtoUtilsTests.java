@@ -30,7 +30,6 @@ public class ScriptSortProtoUtilsTests extends OpenSearchTestCase {
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        // Set up the registry with all built-in converters
         registry = new QueryBuilderProtoConverterRegistryImpl();
     }
 
@@ -138,7 +137,25 @@ public class ScriptSortProtoUtilsTests extends OpenSearchTestCase {
         assertNotNull(result);
         // Default order should be ASC (ScriptSortBuilder default)
         assertEquals(org.opensearch.search.sort.SortOrder.ASC, result.order());
-        assertNull(result.sortMode()); // Should be null when not specified
-        assertNull(result.getNestedSort()); // Should be null when not specified
+        assertNull(result.sortMode());
+        assertNull(result.getNestedSort());
+    }
+
+    public void testFromProto_UnspecifiedType() {
+        InlineScript inlineScript = InlineScript.newBuilder()
+            .setSource("doc['price'].value")
+            .setLang(
+                ScriptLanguage.newBuilder().setBuiltin(org.opensearch.protobufs.BuiltinScriptLanguage.BUILTIN_SCRIPT_LANGUAGE_PAINLESS)
+            )
+            .build();
+
+        Script script = Script.newBuilder().setInline(inlineScript).build();
+
+        ScriptSort scriptSort = ScriptSort.newBuilder().setScript(script).setType(ScriptSortType.SCRIPT_SORT_TYPE_UNSPECIFIED).build();
+
+        IllegalArgumentException exception = expectThrows(IllegalArgumentException.class, () -> {
+            ScriptSortProtoUtils.fromProto(scriptSort, registry);
+        });
+        assertEquals("ScriptSortType must be specified", exception.getMessage());
     }
 }

@@ -34,7 +34,6 @@ public class InnerHitsBuilderProtoUtilsTests extends OpenSearchTestCase {
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        // Set up the registry with all built-in converters
         registry = new QueryBuilderProtoConverterRegistryImpl();
     }
 
@@ -279,32 +278,28 @@ public class InnerHitsBuilderProtoUtilsTests extends OpenSearchTestCase {
     }
 
     public void testFromProtoWithSort() throws IOException {
-        // Create a protobuf InnerHits with sort
         InnerHits innerHits = InnerHits.newBuilder()
             .setName("test_inner_hits")
             .addSort(org.opensearch.protobufs.SortCombinations.newBuilder().build())
             .build();
 
-        // This should work now since sort is implemented
         InnerHitBuilder innerHitBuilder = InnerHitsBuilderProtoUtils.fromProto(innerHits, registry);
 
         assertNotNull("InnerHitBuilder should not be null", innerHitBuilder);
+        assertNotNull("Sorts should not be null", innerHitBuilder.getSorts());
         assertEquals("Name should match", "test_inner_hits", innerHitBuilder.getName());
-        // Note: The sort list may be empty since the SortCombinations is unset
     }
 
     public void testFromProtoWithHighlight() throws IOException {
-        // Create a protobuf InnerHits with highlight
         org.opensearch.protobufs.Highlight highlightProto = org.opensearch.protobufs.Highlight.newBuilder().build();
 
         InnerHits innerHits = InnerHits.newBuilder().setName("test_inner_hits").setHighlight(highlightProto).build();
 
-        // This should work now since highlight is implemented
         InnerHitBuilder innerHitBuilder = InnerHitsBuilderProtoUtils.fromProto(innerHits, registry);
 
         assertNotNull("InnerHitBuilder should not be null", innerHitBuilder);
-        assertEquals("Name should match", "test_inner_hits", innerHitBuilder.getName());
         assertNotNull("HighlightBuilder should not be null", innerHitBuilder.getHighlightBuilder());
+        assertEquals("Name should match", "test_inner_hits", innerHitBuilder.getName());
     }
 
     public void testFromProtoWithCollapse() throws IOException {

@@ -30,12 +30,13 @@ import static org.hamcrest.Matchers.instanceOf;
 
 public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase {
 
+    private QueryBuilderProtoConverterRegistryImpl registry;
+
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        // Set up the registry with all built-in converters
-        QueryBuilderProtoConverterRegistryImpl registry = new QueryBuilderProtoConverterRegistryImpl();
-        FunctionScoreQueryBuilderProtoUtils.setRegistry(registry);
+        // Initialize the registry for FunctionScoreQueryBuilderProtoUtils
+        registry = new QueryBuilderProtoConverterRegistryImpl();
     }
 
     public void testFromProtoWithBasicFunctionScoreQuery() {
@@ -55,7 +56,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
             .setMinScore(0.5f)
             .build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -80,7 +81,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
 
         FunctionScoreQuery functionScoreQuery = FunctionScoreQuery.newBuilder().addFunctions(container).build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -101,7 +102,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
 
         FunctionScoreQuery functionScoreQuery = FunctionScoreQuery.newBuilder().addFunctions(container).build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -114,7 +115,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
     public void testFromProtoWithNullInput() {
         IllegalArgumentException exception = expectThrows(
             IllegalArgumentException.class,
-            () -> FunctionScoreQueryBuilderProtoUtils.fromProto(null)
+            () -> FunctionScoreQueryBuilderProtoUtils.fromProto(null, registry)
         );
 
         assertThat(exception.getMessage(), containsString("FunctionScoreQuery cannot be null"));
@@ -125,7 +126,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
         // This should default to MatchAllQueryBuilder (matching fromXContent behavior)
         FunctionScoreQuery functionScoreQuery = FunctionScoreQuery.newBuilder().build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -142,7 +143,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
 
         FunctionScoreQuery functionScoreQuery = FunctionScoreQuery.newBuilder().addFunctions(container).build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -178,7 +179,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
 
         FunctionScoreQuery functionScoreQuery = FunctionScoreQuery.newBuilder().addFunctions(container).build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -229,7 +230,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
 
         FunctionScoreQuery functionScoreQuery = FunctionScoreQuery.newBuilder().addFunctions(container).build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -276,7 +277,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
 
         FunctionScoreQuery functionScoreQuery = FunctionScoreQuery.newBuilder().addFunctions(container).build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -320,7 +321,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
 
         FunctionScoreQuery functionScoreQuery = FunctionScoreQuery.newBuilder().addFunctions(container).build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -387,7 +388,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
             .addFunctions(container3)
             .build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -424,7 +425,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
             .setBoostMode(FunctionBoostMode.FUNCTION_BOOST_MODE_MULTIPLY)
             .build();
 
-        QueryBuilder result1 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery1);
+        QueryBuilder result1 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery1, registry);
         assertThat(result1, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder builder1 = (FunctionScoreQueryBuilder) result1;
         assertEquals(org.opensearch.common.lucene.search.function.CombineFunction.MULTIPLY, builder1.boostMode());
@@ -434,7 +435,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
             .setBoostMode(FunctionBoostMode.FUNCTION_BOOST_MODE_REPLACE)
             .build();
 
-        QueryBuilder result2 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery2);
+        QueryBuilder result2 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery2, registry);
         assertThat(result2, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder builder2 = (FunctionScoreQueryBuilder) result2;
         assertEquals(org.opensearch.common.lucene.search.function.CombineFunction.REPLACE, builder2.boostMode());
@@ -444,10 +445,40 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
             .setBoostMode(FunctionBoostMode.FUNCTION_BOOST_MODE_SUM)
             .build();
 
-        QueryBuilder result3 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery3);
+        QueryBuilder result3 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery3, registry);
         assertThat(result3, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder builder3 = (FunctionScoreQueryBuilder) result3;
         assertEquals(org.opensearch.common.lucene.search.function.CombineFunction.SUM, builder3.boostMode());
+
+        // Test AVG boost mode
+        FunctionScoreQuery functionScoreQuery4 = FunctionScoreQuery.newBuilder()
+            .setBoostMode(FunctionBoostMode.FUNCTION_BOOST_MODE_AVG)
+            .build();
+
+        QueryBuilder result4 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery4, registry);
+        assertThat(result4, instanceOf(FunctionScoreQueryBuilder.class));
+        FunctionScoreQueryBuilder builder4 = (FunctionScoreQueryBuilder) result4;
+        assertEquals(org.opensearch.common.lucene.search.function.CombineFunction.AVG, builder4.boostMode());
+
+        // Test MAX boost mode
+        FunctionScoreQuery functionScoreQuery5 = FunctionScoreQuery.newBuilder()
+            .setBoostMode(FunctionBoostMode.FUNCTION_BOOST_MODE_MAX)
+            .build();
+
+        QueryBuilder result5 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery5, registry);
+        assertThat(result5, instanceOf(FunctionScoreQueryBuilder.class));
+        FunctionScoreQueryBuilder builder5 = (FunctionScoreQueryBuilder) result5;
+        assertEquals(org.opensearch.common.lucene.search.function.CombineFunction.MAX, builder5.boostMode());
+
+        // Test MIN boost mode
+        FunctionScoreQuery functionScoreQuery6 = FunctionScoreQuery.newBuilder()
+            .setBoostMode(FunctionBoostMode.FUNCTION_BOOST_MODE_MIN)
+            .build();
+
+        QueryBuilder result6 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery6, registry);
+        assertThat(result6, instanceOf(FunctionScoreQueryBuilder.class));
+        FunctionScoreQueryBuilder builder6 = (FunctionScoreQueryBuilder) result6;
+        assertEquals(org.opensearch.common.lucene.search.function.CombineFunction.MIN, builder6.boostMode());
     }
 
     public void testFromProtoWithDifferentScoreModes() {
@@ -456,7 +487,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
             .setScoreMode(FunctionScoreMode.FUNCTION_SCORE_MODE_MULTIPLY)
             .build();
 
-        QueryBuilder result1 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery1);
+        QueryBuilder result1 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery1, registry);
         assertThat(result1, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder builder1 = (FunctionScoreQueryBuilder) result1;
         assertEquals(org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MULTIPLY, builder1.scoreMode());
@@ -466,7 +497,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
             .setScoreMode(FunctionScoreMode.FUNCTION_SCORE_MODE_SUM)
             .build();
 
-        QueryBuilder result2 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery2);
+        QueryBuilder result2 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery2, registry);
         assertThat(result2, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder builder2 = (FunctionScoreQueryBuilder) result2;
         assertEquals(org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.SUM, builder2.scoreMode());
@@ -476,10 +507,40 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
             .setScoreMode(FunctionScoreMode.FUNCTION_SCORE_MODE_AVG)
             .build();
 
-        QueryBuilder result3 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery3);
+        QueryBuilder result3 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery3, registry);
         assertThat(result3, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder builder3 = (FunctionScoreQueryBuilder) result3;
         assertEquals(org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.AVG, builder3.scoreMode());
+
+        // Test FIRST score mode
+        FunctionScoreQuery functionScoreQuery4 = FunctionScoreQuery.newBuilder()
+            .setScoreMode(FunctionScoreMode.FUNCTION_SCORE_MODE_FIRST)
+            .build();
+
+        QueryBuilder result4 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery4, registry);
+        assertThat(result4, instanceOf(FunctionScoreQueryBuilder.class));
+        FunctionScoreQueryBuilder builder4 = (FunctionScoreQueryBuilder) result4;
+        assertEquals(org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.FIRST, builder4.scoreMode());
+
+        // Test MAX score mode
+        FunctionScoreQuery functionScoreQuery5 = FunctionScoreQuery.newBuilder()
+            .setScoreMode(FunctionScoreMode.FUNCTION_SCORE_MODE_MAX)
+            .build();
+
+        QueryBuilder result5 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery5, registry);
+        assertThat(result5, instanceOf(FunctionScoreQueryBuilder.class));
+        FunctionScoreQueryBuilder builder5 = (FunctionScoreQueryBuilder) result5;
+        assertEquals(org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MAX, builder5.scoreMode());
+
+        // Test MIN score mode
+        FunctionScoreQuery functionScoreQuery6 = FunctionScoreQuery.newBuilder()
+            .setScoreMode(FunctionScoreMode.FUNCTION_SCORE_MODE_MIN)
+            .build();
+
+        QueryBuilder result6 = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery6, registry);
+        assertThat(result6, instanceOf(FunctionScoreQueryBuilder.class));
+        FunctionScoreQueryBuilder builder6 = (FunctionScoreQueryBuilder) result6;
+        assertEquals(org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MIN, builder6.scoreMode());
     }
 
     public void testFromProtoWithFunctionAndFilter() {
@@ -507,7 +568,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
 
         FunctionScoreQuery functionScoreQuery = FunctionScoreQuery.newBuilder().addFunctions(container).build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -533,7 +594,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
         // This should throw an exception because decay function has no placements
         IllegalArgumentException exception = expectThrows(
             IllegalArgumentException.class,
-            () -> FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery)
+            () -> FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry)
         );
 
         assertThat(exception.getMessage(), containsString("DecayFunction must have at least one placement"));
@@ -579,7 +640,7 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
             .addFunctions(container2)
             .build();
 
-        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery);
+        QueryBuilder result = FunctionScoreQueryBuilderProtoUtils.fromProto(functionScoreQuery, registry);
 
         assertThat(result, instanceOf(FunctionScoreQueryBuilder.class));
         FunctionScoreQueryBuilder functionScoreQueryBuilder = (FunctionScoreQueryBuilder) result;
@@ -596,4 +657,5 @@ public class FunctionScoreQueryBuilderProtoUtilsTests extends OpenSearchTestCase
         assertNotNull(functionScoreQueryBuilder.filterFunctionBuilders());
         assertEquals(2, functionScoreQueryBuilder.filterFunctionBuilders().length);
     }
+
 }
