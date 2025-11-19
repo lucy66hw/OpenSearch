@@ -63,22 +63,31 @@ class FieldValueFactorFunctionProtoUtils {
     private static org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier parseFieldValueFactorModifier(
         FieldValueFactorModifier modifier
     ) {
-        return switch (modifier) {
-            case FIELD_VALUE_FACTOR_MODIFIER_NONE -> org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.NONE;
-            case FIELD_VALUE_FACTOR_MODIFIER_LOG -> org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LOG;
-            case FIELD_VALUE_FACTOR_MODIFIER_LOG1P -> org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LOG1P;
-            case FIELD_VALUE_FACTOR_MODIFIER_LOG2P -> org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LOG2P;
-            case FIELD_VALUE_FACTOR_MODIFIER_LN -> org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LN;
-            case FIELD_VALUE_FACTOR_MODIFIER_LN1P -> org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LN1P;
-            case FIELD_VALUE_FACTOR_MODIFIER_LN2P -> org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LN2P;
-            case FIELD_VALUE_FACTOR_MODIFIER_SQUARE ->
-                org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.SQUARE;
-            case FIELD_VALUE_FACTOR_MODIFIER_SQRT -> org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.SQRT;
-            case FIELD_VALUE_FACTOR_MODIFIER_RECIPROCAL ->
-                org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.RECIPROCAL;
-            case FIELD_VALUE_FACTOR_MODIFIER_UNSPECIFIED ->
-                org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.NONE;
-            default -> throw new IllegalArgumentException("Unknown FieldValueFactorModifier: " + modifier);
-        };
+        switch (modifier) {
+            case FIELD_VALUE_FACTOR_MODIFIER_NONE:
+                return org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.NONE;
+            case FIELD_VALUE_FACTOR_MODIFIER_LOG:
+                return org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LOG;
+            case FIELD_VALUE_FACTOR_MODIFIER_LOG1P:
+                return org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LOG1P;
+            case FIELD_VALUE_FACTOR_MODIFIER_LOG2P:
+                return org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LOG2P;
+            case FIELD_VALUE_FACTOR_MODIFIER_LN:
+                return org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LN;
+            case FIELD_VALUE_FACTOR_MODIFIER_LN1P:
+                return org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LN1P;
+            case FIELD_VALUE_FACTOR_MODIFIER_LN2P:
+                return org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.LN2P;
+            case FIELD_VALUE_FACTOR_MODIFIER_SQUARE:
+                return org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.SQUARE;
+            case FIELD_VALUE_FACTOR_MODIFIER_SQRT:
+                return org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.SQRT;
+            case FIELD_VALUE_FACTOR_MODIFIER_RECIPROCAL:
+                return org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.RECIPROCAL;
+            case FIELD_VALUE_FACTOR_MODIFIER_UNSPECIFIED:
+                return org.opensearch.common.lucene.search.function.FieldValueFactorFunction.Modifier.NONE;
+            default:
+                throw new IllegalArgumentException("Unknown FieldValueFactorModifier: " + modifier);
+        }
     }
 }

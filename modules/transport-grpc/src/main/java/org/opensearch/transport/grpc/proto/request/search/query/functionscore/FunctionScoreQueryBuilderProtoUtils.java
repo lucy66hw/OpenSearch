@@ -180,15 +180,22 @@ class FunctionScoreQueryBuilderProtoUtils {
 
         FunctionScoreContainer.FunctionScoreContainerCase functionCase = container.getFunctionScoreContainerCase();
 
-        return switch (functionCase) {
-            case FIELD_VALUE_FACTOR -> FieldValueFactorFunctionProtoUtils.fromProto(container.getFieldValueFactor());
-            case RANDOM_SCORE -> RandomScoreFunctionProtoUtils.fromProto(container.getRandomScore());
-            case SCRIPT_SCORE -> ScriptScoreFunctionProtoUtils.fromProto(container.getScriptScore());
-            case EXP -> ExpDecayFunctionProtoUtils.fromProto(container.getExp());
-            case GAUSS -> GaussDecayFunctionProtoUtils.fromProto(container.getGauss());
-            case LINEAR -> LinearDecayFunctionProtoUtils.fromProto(container.getLinear());
-            default -> throw new IllegalArgumentException("Unsupported function score type: " + functionCase);
-        };
+        switch (functionCase) {
+            case FIELD_VALUE_FACTOR:
+                return FieldValueFactorFunctionProtoUtils.fromProto(container.getFieldValueFactor());
+            case RANDOM_SCORE:
+                return RandomScoreFunctionProtoUtils.fromProto(container.getRandomScore());
+            case SCRIPT_SCORE:
+                return ScriptScoreFunctionProtoUtils.fromProto(container.getScriptScore());
+            case EXP:
+                return ExpDecayFunctionProtoUtils.fromProto(container.getExp());
+            case GAUSS:
+                return GaussDecayFunctionProtoUtils.fromProto(container.getGauss());
+            case LINEAR:
+                return LinearDecayFunctionProtoUtils.fromProto(container.getLinear());
+            default:
+                throw new IllegalArgumentException("Unsupported function score type: " + functionCase);
+        }
     }
 
     /**
@@ -198,15 +205,22 @@ class FunctionScoreQueryBuilderProtoUtils {
      * @throws IllegalArgumentException if the boostMode is unknown or unsupported
      */
     private static CombineFunction parseBoostMode(FunctionBoostMode boostMode) {
-        return switch (boostMode) {
-            case FUNCTION_BOOST_MODE_AVG -> CombineFunction.AVG;
-            case FUNCTION_BOOST_MODE_MAX -> CombineFunction.MAX;
-            case FUNCTION_BOOST_MODE_MIN -> CombineFunction.MIN;
-            case FUNCTION_BOOST_MODE_MULTIPLY -> CombineFunction.MULTIPLY;
-            case FUNCTION_BOOST_MODE_REPLACE -> CombineFunction.REPLACE;
-            case FUNCTION_BOOST_MODE_SUM -> CombineFunction.SUM;
-            default -> throw new IllegalArgumentException("Unsupported boost mode: " + boostMode);
-        };
+        switch (boostMode) {
+            case FUNCTION_BOOST_MODE_AVG:
+                return CombineFunction.AVG;
+            case FUNCTION_BOOST_MODE_MAX:
+                return CombineFunction.MAX;
+            case FUNCTION_BOOST_MODE_MIN:
+                return CombineFunction.MIN;
+            case FUNCTION_BOOST_MODE_MULTIPLY:
+                return CombineFunction.MULTIPLY;
+            case FUNCTION_BOOST_MODE_REPLACE:
+                return CombineFunction.REPLACE;
+            case FUNCTION_BOOST_MODE_SUM:
+                return CombineFunction.SUM;
+            default:
+                throw new IllegalArgumentException("Unsupported boost mode: " + boostMode);
+        }
     }
 
     /**
@@ -217,15 +231,22 @@ class FunctionScoreQueryBuilderProtoUtils {
      * @throws IllegalArgumentException if the scoreMode is unknown or unsupported
      */
     private static org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode parseScoreMode(FunctionScoreMode scoreMode) {
-        return switch (scoreMode) {
-            case FUNCTION_SCORE_MODE_AVG -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.AVG;
-            case FUNCTION_SCORE_MODE_FIRST -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.FIRST;
-            case FUNCTION_SCORE_MODE_MAX -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MAX;
-            case FUNCTION_SCORE_MODE_MIN -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MIN;
-            case FUNCTION_SCORE_MODE_MULTIPLY -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MULTIPLY;
-            case FUNCTION_SCORE_MODE_SUM -> org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.SUM;
-            default -> throw new IllegalArgumentException("Unsupported score mode: " + scoreMode);
-        };
+        switch (scoreMode) {
+            case FUNCTION_SCORE_MODE_AVG:
+                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.AVG;
+            case FUNCTION_SCORE_MODE_FIRST:
+                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.FIRST;
+            case FUNCTION_SCORE_MODE_MAX:
+                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MAX;
+            case FUNCTION_SCORE_MODE_MIN:
+                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MIN;
+            case FUNCTION_SCORE_MODE_MULTIPLY:
+                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.MULTIPLY;
+            case FUNCTION_SCORE_MODE_SUM:
+                return org.opensearch.common.lucene.search.function.FunctionScoreQuery.ScoreMode.SUM;
+            default:
+                throw new IllegalArgumentException("Unsupported score mode: " + scoreMode);
+        }
     }
 
 }
