@@ -127,13 +127,16 @@ public class OpenSearchExceptionProtoUtils {
             errorCauseBuilder.setReason(message);
         }
 
+        // Build metadata ObjectMap
+        ObjectMap.Builder metadataBuilder = ObjectMap.newBuilder();
+
         // Add custom metadata fields propogated by the child classes of OpenSearchException
         for (Map.Entry<String, List<String>> entry : metadata.entrySet()) {
             Map.Entry<String, ObjectMap.Value> protoEntry = headerToValueProto(
                 entry.getKey().substring(OPENSEARCH_PREFIX_KEY.length()),
                 entry.getValue()
             );
-            errorCauseBuilder.putMetadata(protoEntry.getKey(), protoEntry.getValue());
+            metadataBuilder.putFields(protoEntry.getKey(), protoEntry.getValue());
         }
 
         // Add metadata if the throwable is an OpenSearchException
@@ -141,8 +144,13 @@ public class OpenSearchExceptionProtoUtils {
             OpenSearchException exception = (OpenSearchException) throwable;
             Map<String, ObjectMap.Value> moreMetadata = metadataToProto(exception);
             for (Map.Entry<String, ObjectMap.Value> entry : moreMetadata.entrySet()) {
-                errorCauseBuilder.putMetadata(entry.getKey(), entry.getValue());
+                metadataBuilder.putFields(entry.getKey(), entry.getValue());
             }
+        }
+
+        // Set the metadata if any fields were added
+        if (metadataBuilder.getFieldsCount() > 0) {
+            errorCauseBuilder.setMetadata(metadataBuilder.build());
         }
 
         if (cause != null) {
