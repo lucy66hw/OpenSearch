@@ -179,8 +179,8 @@ public final class GrpcPlugin extends Plugin implements NetworkPlugin, Extensibl
         }
 
         List<BindableService> grpcServices = registerGRPCServices(
-            new DocumentServiceImpl(client),
-            new SearchServiceImpl(client, queryUtils)
+            new DocumentServiceImpl(client, circuitBreakerService),
+            new SearchServiceImpl(client, queryUtils, circuitBreakerService)
         );
         return Collections.singletonMap(
             GRPC_TRANSPORT_SETTING_KEY,
@@ -222,8 +222,8 @@ public final class GrpcPlugin extends Plugin implements NetworkPlugin, Extensibl
         }
 
         List<BindableService> grpcServices = registerGRPCServices(
-            new DocumentServiceImpl(client),
-            new SearchServiceImpl(client, queryUtils)
+            new DocumentServiceImpl(client, circuitBreakerService),
+            new SearchServiceImpl(client, queryUtils, circuitBreakerService)
         );
         return Collections.singletonMap(
             GRPC_SECURE_TRANSPORT_SETTING_KEY,
