@@ -235,7 +235,7 @@ public final class GrpcPlugin extends Plugin implements NetworkPlugin, Extensibl
                 secureAuxTransportSettingsProvider,
                 serverInterceptor
             )
-            );
+        );
     }
 
     /**
