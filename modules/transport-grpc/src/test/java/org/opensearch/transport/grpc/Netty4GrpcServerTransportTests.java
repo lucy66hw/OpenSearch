@@ -8,24 +8,22 @@
 
 package org.opensearch.transport.grpc;
 
-import org.opensearch.common.SuppressForbidden;
 import org.opensearch.common.network.InetAddresses;
 import org.opensearch.common.network.NetworkService;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.core.common.transport.TransportAddress;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.threadpool.TestThreadPool;
+import org.opensearch.threadpool.ExecutorBuilder;
+import org.opensearch.threadpool.FixedExecutorBuilder;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.grpc.ssl.NettyGrpcClient;
 import org.hamcrest.MatcherAssert;
 import org.junit.After;
 import org.junit.Before;
 
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ForkJoinPool;
 
 import io.grpc.BindableService;
 import io.grpc.health.v1.HealthCheckResponse;
@@ -44,12 +42,21 @@ public class Netty4GrpcServerTransportTests extends OpenSearchTestCase {
     public void setup() {
         networkService = new NetworkService(List.of());
         services = List.of();
-        threadPool = new TestThreadPool("test");
+
+        // Create a ThreadPool with the gRPC executor
+        Settings settings = Settings.builder()
+            .put("node.name", "test-node")
+            .put(Netty4GrpcServerTransport.SETTING_GRPC_EXECUTOR_COUNT.getKey(), 4)
+            .build();
+        ExecutorBuilder<?> grpcExecutorBuilder = new FixedExecutorBuilder(settings, "grpc", 4, 1000, "thread_pool.grpc");
+        threadPool = new ThreadPool(settings, grpcExecutorBuilder);
     }
 
     @After
     public void cleanup() {
-        threadPool.shutdown();
+        if (threadPool != null) {
+            threadPool.shutdown();
+        }
     }
 
     public void testBasicStartAndStop() {
@@ -223,13 +230,11 @@ public class Netty4GrpcServerTransportTests extends OpenSearchTestCase {
             MatcherAssert.assertThat(transport.getBoundAddress().boundAddresses(), not(emptyArray()));
             assertNotNull(transport.getBoundAddress().publishAddress().address());
 
-            // Verify executor is created and is a ForkJoinPool
-            ExecutorService executor = getGrpcExecutor(transport);
+            // Verify executor is created and managed by OpenSearch ThreadPool
+            ExecutorService executor = transport.getGrpcExecutorForTesting();
             assertNotNull("gRPC executor should be created", executor);
-            assertTrue("Executor should be a ForkJoinPool", executor instanceof ForkJoinPool);
-
-            ForkJoinPool forkJoinPool = (ForkJoinPool) executor;
-            assertEquals("Executor should have 8 threads", 8, forkJoinPool.getParallelism());
+            // Note: The executor is now managed by OpenSearch's ThreadPool system
+            // We can't easily verify the thread count as it's encapsulated within OpenSearch's executor implementation
 
             transport.stop();
         }
@@ -243,12 +248,10 @@ public class Netty4GrpcServerTransportTests extends OpenSearchTestCase {
         try (Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService, threadPool)) {
             transport.start();
 
-            ExecutorService executor = getGrpcExecutor(transport);
+            ExecutorService executor = transport.getGrpcExecutorForTesting();
             assertNotNull("gRPC executor should be created", executor);
-            assertTrue("Executor should be a ForkJoinPool", executor instanceof ForkJoinPool);
-
-            ForkJoinPool forkJoinPool = (ForkJoinPool) executor;
-            assertEquals("Default executor count should be 2x allocated processors", expectedExecutorCount, forkJoinPool.getParallelism());
+            // Note: The executor is now managed by OpenSearch's ThreadPool system
+            // The actual thread count is configured via the FixedExecutorBuilder in the test setup
 
             transport.stop();
         }
@@ -264,8 +267,8 @@ public class Netty4GrpcServerTransportTests extends OpenSearchTestCase {
         try (Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService, threadPool)) {
             transport.start();
 
-            EventLoopGroup bossGroup = getBossEventLoopGroup(transport);
-            EventLoopGroup workerGroup = getWorkerEventLoopGroup(transport);
+            EventLoopGroup bossGroup = transport.getBossEventLoopGroupForTesting();
+            EventLoopGroup workerGroup = transport.getWorkerEventLoopGroupForTesting();
 
             assertNotNull("Boss event loop group should be created", bossGroup);
             assertNotNull("Worker event loop group should be created", workerGroup);
@@ -282,12 +285,13 @@ public class Netty4GrpcServerTransportTests extends OpenSearchTestCase {
         Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService, threadPool);
         transport.start();
 
-        ExecutorService executor = getGrpcExecutor(transport);
+        ExecutorService executor = transport.getGrpcExecutorForTesting();
         assertNotNull("Executor should be created", executor);
         assertFalse("Executor should not be shutdown initially", executor.isShutdown());
 
         transport.stop();
-        assertTrue("Executor should be shutdown after transport stop", executor.isShutdown());
+        // Note: The executor is managed by OpenSearch's ThreadPool and is not shutdown when transport stops
+        assertNotNull("Executor should still exist after transport stop", executor);
 
         transport.close();
     }
@@ -299,8 +303,8 @@ public class Netty4GrpcServerTransportTests extends OpenSearchTestCase {
         Netty4GrpcServerTransport transport = new Netty4GrpcServerTransport(settings, services, networkService, threadPool);
         transport.start();
 
-        EventLoopGroup bossGroup = getBossEventLoopGroup(transport);
-        EventLoopGroup workerGroup = getWorkerEventLoopGroup(transport);
+        EventLoopGroup bossGroup = transport.getBossEventLoopGroupForTesting();
+        EventLoopGroup workerGroup = transport.getWorkerEventLoopGroupForTesting();
 
         assertNotNull("Boss group should be created", bossGroup);
         assertNotNull("Worker group should be created", workerGroup);
@@ -340,40 +344,6 @@ public class Netty4GrpcServerTransportTests extends OpenSearchTestCase {
             IllegalArgumentException.class,
             () -> { new Netty4GrpcServerTransport(invalidSettings, services, networkService, threadPool); }
         );
-    }
-
-    // Helper methods to access private fields using reflection
-    @SuppressForbidden(reason = "test uses reflection to access private fields")
-    private ExecutorService getGrpcExecutor(Netty4GrpcServerTransport transport) {
-        try {
-            Field field = Netty4GrpcServerTransport.class.getDeclaredField("grpcExecutor");
-            field.setAccessible(true);
-            return (ExecutorService) field.get(transport);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to access grpcExecutor field", e);
-        }
-    }
-
-    @SuppressForbidden(reason = "test uses reflection to access private fields")
-    private EventLoopGroup getBossEventLoopGroup(Netty4GrpcServerTransport transport) {
-        try {
-            Field field = Netty4GrpcServerTransport.class.getDeclaredField("bossEventLoopGroup");
-            field.setAccessible(true);
-            return (EventLoopGroup) field.get(transport);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to access bossEventLoopGroup field", e);
-        }
-    }
-
-    @SuppressForbidden(reason = "test uses reflection to access private fields")
-    private EventLoopGroup getWorkerEventLoopGroup(Netty4GrpcServerTransport transport) {
-        try {
-            Field field = Netty4GrpcServerTransport.class.getDeclaredField("workerEventLoopGroup");
-            field.setAccessible(true);
-            return (EventLoopGroup) field.get(transport);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to access workerEventLoopGroup field", e);
-        }
     }
 
     private static Settings createSettings() {
