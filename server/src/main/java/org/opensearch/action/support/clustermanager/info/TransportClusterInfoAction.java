@@ -41,6 +41,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.core.common.io.stream.Writeable;
+import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
@@ -77,33 +78,45 @@ public abstract class TransportClusterInfoAction<Request extends ClusterInfoRequ
             .indicesBlockedException(ClusterBlockLevel.METADATA_READ, indexNameExpressionResolver.concreteIndexNames(state, request));
     }
 
-    /** @deprecated As of 2.2, because supporting inclusive language, replaced by {@link #clusterManagerOperation(ClusterInfoRequest, ClusterState, ActionListener)} */
+    /** @deprecated As of 2.2, because supporting inclusive language, replaced by {@link #clusterManagerOperation(Task, ClusterInfoRequest, ClusterState, ActionListener)} */
     @Deprecated
     protected final void masterOperation(final Request request, final ClusterState state, final ActionListener<Response> listener) {
-        clusterManagerOperation(request, state, listener);
+        clusterManagerOperation(null, request, state, listener);
     }
 
     @Override
-    protected final void clusterManagerOperation(final Request request, final ClusterState state, final ActionListener<Response> listener) {
+    protected final void clusterManagerOperation(
+        Task task,
+        final Request request,
+        final ClusterState state,
+        final ActionListener<Response> listener
+    ) {
         String[] concreteIndices = indexNameExpressionResolver.concreteIndexNames(state, request);
-        doClusterManagerOperation(request, concreteIndices, state, listener);
+        doClusterManagerOperation(task, request, concreteIndices, state, listener);
     }
 
     // TODO: Add abstract keyword after removing the deprecated doMasterOperation()
     protected void doClusterManagerOperation(
+        Task task,
         Request request,
         String[] concreteIndices,
         ClusterState state,
         ActionListener<Response> listener
     ) {
-        doMasterOperation(request, concreteIndices, state, listener);
+        doMasterOperation(task, request, concreteIndices, state, listener);
     }
 
     /**
-     * @deprecated As of 2.2, because supporting inclusive language, replaced by {@link #doClusterManagerOperation(ClusterInfoRequest, String[], ClusterState, ActionListener)}
+     * @deprecated As of 2.2, because supporting inclusive language, replaced by {@link #doClusterManagerOperation(Task, ClusterInfoRequest, String[], ClusterState, ActionListener)}
      */
     @Deprecated
-    protected void doMasterOperation(Request request, String[] concreteIndices, ClusterState state, ActionListener<Response> listener) {
+    protected void doMasterOperation(
+        Task task,
+        Request request,
+        String[] concreteIndices,
+        ClusterState state,
+        ActionListener<Response> listener
+    ) {
         throw new UnsupportedOperationException("Must be overridden");
     }
 

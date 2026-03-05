@@ -48,6 +48,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.index.Index;
 import org.opensearch.indices.IndicesService;
 import org.opensearch.telemetry.tracing.noop.NoopTracer;
+import org.opensearch.tasks.Task;
 import org.opensearch.test.OpenSearchSingleNodeTestCase;
 import org.opensearch.test.transport.CapturingTransport;
 import org.opensearch.threadpool.TestThreadPool;
@@ -171,13 +172,14 @@ public class GetIndexActionTests extends OpenSearchSingleNodeTestCase {
 
         @Override
         protected void doClusterManagerOperation(
+            Task task,
             GetIndexRequest request,
             String[] concreteIndices,
             ClusterState state,
             ActionListener<GetIndexResponse> listener
         ) {
             ClusterState stateWithIndex = ClusterStateCreationUtils.stateWithContext(indexName, 1, 1, context);
-            super.doClusterManagerOperation(request, concreteIndices, stateWithIndex, listener);
+            super.doClusterManagerOperation(task, request, concreteIndices, stateWithIndex, listener);
         }
     }
 

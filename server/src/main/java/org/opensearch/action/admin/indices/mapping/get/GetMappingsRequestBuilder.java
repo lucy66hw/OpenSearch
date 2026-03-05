@@ -50,4 +50,10 @@ public class GetMappingsRequestBuilder extends ClusterInfoRequestBuilder<
     public GetMappingsRequestBuilder(OpenSearchClient client, GetMappingsAction action, String... indices) {
         super(client, action, new GetMappingsRequest().indices(indices));
     }
+
+    /** Include inferred (dynamic) field names in the response. */
+    public GetMappingsRequestBuilder setIncludeInferred(boolean includeInferred) {
+        request.includeInferred(includeInferred);
+        return this;
+    }
 }

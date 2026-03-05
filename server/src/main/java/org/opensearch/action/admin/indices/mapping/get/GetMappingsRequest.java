@@ -36,8 +36,11 @@ import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.action.support.master.info.ClusterInfoRequest;
 import org.opensearch.common.annotation.PublicApi;
 import org.opensearch.core.common.io.stream.StreamInput;
+import org.opensearch.core.common.io.stream.StreamOutput;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Transport request to get field mappings.
@@ -47,15 +50,50 @@ import java.io.IOException;
 @PublicApi(since = "1.0.0")
 public class GetMappingsRequest extends ClusterInfoRequest<GetMappingsRequest> {
 
+    private boolean includeInferred = false;
+
     public GetMappingsRequest() {}
 
     public GetMappingsRequest(StreamInput in) throws IOException {
         super(in);
+        this.includeInferred = in.readBoolean();
+    }
+
+    /** When true, include inferred (dynamic) field names in the response. Default is false. */
+    public boolean includeInferred() {
+        return includeInferred;
+    }
+
+    /** Set to true to include inferred field names in the mapping response. */
+    public GetMappingsRequest includeInferred(boolean includeInferred) {
+        this.includeInferred = includeInferred;
+        return this;
+    }
+
+    @Override
+    public void writeTo(StreamOutput out) throws IOException {
+        super.writeTo(out);
+        out.writeBoolean(includeInferred);
     }
 
     @Override
     public ActionRequestValidationException validate() {
         return null;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        GetMappingsRequest that = (GetMappingsRequest) o;
+        return includeInferred == that.includeInferred
+            && Arrays.equals(indices(), that.indices())
+            && Objects.equals(indicesOptions(), that.indicesOptions());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(includeInferred, Arrays.hashCode(indices()), indicesOptions());
     }
 
 }

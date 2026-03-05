@@ -48,6 +48,7 @@ import org.opensearch.common.settings.SettingsFilter;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.indices.IndicesService;
+import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
@@ -102,6 +103,7 @@ public class TransportGetIndexAction extends TransportClusterInfoAction<GetIndex
 
     @Override
     protected void doClusterManagerOperation(
+        Task task,
         final GetIndexRequest request,
         String[] concreteIndices,
         final ClusterState state,

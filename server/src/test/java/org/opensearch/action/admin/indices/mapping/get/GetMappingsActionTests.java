@@ -84,6 +84,7 @@ public class GetMappingsActionTests extends OpenSearchTestCase {
     private DiscoveryNode localNode;
     private DiscoveryNode remoteNode;
     private DiscoveryNode[] allNodes;
+    private TransportGetInferredFieldsAction transportGetInferredFieldsAction;
     private TransportGetMappingsAction transportAction = null;
 
     @Before
@@ -122,13 +123,15 @@ public class GetMappingsActionTests extends OpenSearchTestCase {
         );
         allNodes = new DiscoveryNode[] { localNode, remoteNode };
         setState(clusterService, ClusterStateCreationUtils.state(localNode, remoteNode, allNodes));
+        transportGetInferredFieldsAction = mock(TransportGetInferredFieldsAction.class);
         transportAction = new TransportGetMappingsAction(
             GetMappingsActionTests.this.transportService,
             GetMappingsActionTests.this.clusterService,
             GetMappingsActionTests.this.threadPool,
             new ActionFilters(emptySet()),
             new IndexNameExpressionResolver(new ThreadContext(Settings.EMPTY)),
-            mock(IndicesService.class)
+            mock(IndicesService.class),
+            transportGetInferredFieldsAction
         );
 
     }
@@ -222,6 +225,25 @@ public class GetMappingsActionTests extends OpenSearchTestCase {
         capturingTransport.handleResponse(capturedRequest.requestId, termResp);
 
         // no more transport calls
+        assertThat(capturingTransport.capturedRequests().length, equalTo(1));
+    }
+
+    public void testIncludeInferredFalseCompletesWithoutCallingGetInferredFields() {
+        GetMappingsRequest request = new GetMappingsRequest();
+        request.includeInferred(false);
+        transportAction.execute(null, request, ActionListener.wrap(Assert::assertNotNull, exception -> { throw new AssertionError(exception); }));
+        assertThat(capturingTransport.capturedRequests().length, equalTo(1));
+        CapturingTransport.CapturedRequest capturedRequest = capturingTransport.capturedRequests()[0];
+        GetTermVersionResponse termResp = new GetTermVersionResponse(
+            new ClusterStateTermVersion(
+                clusterService.state().getClusterName(),
+                clusterService.state().metadata().clusterUUID(),
+                clusterService.state().term(),
+                clusterService.state().version()
+            )
+        );
+        capturingTransport.handleResponse(capturedRequest.requestId, termResp);
+        // With includeInferred=false, flow completes with cluster-state mappings only (GetInferredFields not used)
         assertThat(capturingTransport.capturedRequests().length, equalTo(1));
     }
 }

@@ -37,18 +37,26 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.clustermanager.info.TransportClusterInfoAction;
 import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.metadata.MappingMetadata;
+import org.opensearch.index.IndexSettings;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.io.stream.StreamInput;
+import org.opensearch.index.mapper.MapperService;
 import org.opensearch.indices.IndicesService;
+import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Transport action to get field mappings.
@@ -59,7 +67,11 @@ public class TransportGetMappingsAction extends TransportClusterInfoAction<GetMa
 
     private static final Logger logger = LogManager.getLogger(TransportGetMappingsAction.class);
 
+    /** Shared property map for inferred keyword fields to avoid per-field allocations. */
+    private static final Map<String, Object> INFERRED_KEYWORD_PROPERTY = Map.of("type", "keyword");
+
     private final IndicesService indicesService;
+    private final TransportGetInferredFieldsAction transportGetInferredFieldsAction;
 
     @Inject
     public TransportGetMappingsAction(
@@ -68,7 +80,8 @@ public class TransportGetMappingsAction extends TransportClusterInfoAction<GetMa
         ThreadPool threadPool,
         ActionFilters actionFilters,
         IndexNameExpressionResolver indexNameExpressionResolver,
-        IndicesService indicesService
+        IndicesService indicesService,
+        TransportGetInferredFieldsAction transportGetInferredFieldsAction
     ) {
         super(
             GetMappingsAction.NAME,
@@ -80,6 +93,7 @@ public class TransportGetMappingsAction extends TransportClusterInfoAction<GetMa
             indexNameExpressionResolver
         );
         this.indicesService = indicesService;
+        this.transportGetInferredFieldsAction = transportGetInferredFieldsAction;
     }
 
     @Override
@@ -89,6 +103,7 @@ public class TransportGetMappingsAction extends TransportClusterInfoAction<GetMa
 
     @Override
     protected void doClusterManagerOperation(
+        Task task,
         final GetMappingsRequest request,
         String[] concreteIndices,
         final ClusterState state,
@@ -97,9 +112,73 @@ public class TransportGetMappingsAction extends TransportClusterInfoAction<GetMa
         logger.trace("serving getMapping request based on version {}", state.version());
         try {
             final Map<String, MappingMetadata> result = state.metadata().findMappings(concreteIndices, indicesService.getFieldFilter());
-            listener.onResponse(new GetMappingsResponse(result));
+            if (request.includeInferred() == false || concreteIndices.length == 0) {
+                listener.onResponse(new GetMappingsResponse(result));
+                return;
+            }
+            // Only request inferred fields from indices that have inferred mapping mode enabled
+            List<String> indicesWithInferEnabled = new ArrayList<>();
+            for (String indexName : concreteIndices) {
+                IndexMetadata indexMetadata = state.metadata().index(indexName);
+                if (indexMetadata != null
+                    && IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.get(indexMetadata.getSettings())) {
+                    indicesWithInferEnabled.add(indexName);
+                }
+            }
+            if (indicesWithInferEnabled.isEmpty()) {
+                listener.onResponse(new GetMappingsResponse(result));
+                return;
+            }
+            GetInferredFieldsRequest inferredRequest = new GetInferredFieldsRequest(
+                indicesWithInferEnabled.toArray(new String[0])
+            );
+            transportGetInferredFieldsAction.execute(
+                task,
+                inferredRequest,
+                ActionListener.wrap(
+                    inferredResponse -> {
+                        Map<String, Set<String>> inferredByIndex = inferredResponse.getInferredFieldsByIndex();
+                        Map<String, MappingMetadata> merged = mergeInferredIntoMappings(result, inferredByIndex);
+                        listener.onResponse(new GetMappingsResponse(merged));
+                    },
+                    listener::onFailure
+                )
+            );
         } catch (IOException e) {
             listener.onFailure(e);
         }
+    }
+
+    /**
+     * Merge inferred field names into each index's mapping as properties with type "keyword".
+     * Returns a new map; does not mutate the original result.
+     */
+    private static Map<String, MappingMetadata> mergeInferredIntoMappings(
+        Map<String, MappingMetadata> result,
+        Map<String, Set<String>> inferredByIndex
+    ) throws IOException {
+        if (inferredByIndex == null || inferredByIndex.isEmpty()) {
+            return result;
+        }
+        Map<String, MappingMetadata> merged = new HashMap<>();
+        for (Map.Entry<String, MappingMetadata> entry : result.entrySet()) {
+            String indexName = entry.getKey();
+            MappingMetadata mappingMetadata = entry.getValue();
+            Set<String> inferred = inferredByIndex.get(indexName);
+            if (inferred == null || inferred.isEmpty()) {
+                merged.put(indexName, mappingMetadata);
+                continue;
+            }
+            Map<String, Object> source = new HashMap<>(mappingMetadata.sourceAsMap());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> properties = (Map<String, Object>) source.get("properties");
+            Map<String, Object> newProperties = properties != null ? new HashMap<>(properties) : new HashMap<>();
+            for (String fieldName : inferred) {
+                newProperties.put(fieldName, INFERRED_KEYWORD_PROPERTY);
+            }
+            source.put("properties", newProperties);
+            merged.put(indexName, new MappingMetadata(MapperService.SINGLE_MAPPING_NAME, source));
+        }
+        return merged;
     }
 }

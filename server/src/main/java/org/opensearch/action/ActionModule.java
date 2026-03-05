@@ -162,8 +162,10 @@ import org.opensearch.action.admin.indices.forcemerge.TransportForceMergeAction;
 import org.opensearch.action.admin.indices.get.GetIndexAction;
 import org.opensearch.action.admin.indices.get.TransportGetIndexAction;
 import org.opensearch.action.admin.indices.mapping.get.GetFieldMappingsAction;
+import org.opensearch.action.admin.indices.mapping.get.GetInferredFieldsAction;
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsAction;
 import org.opensearch.action.admin.indices.mapping.get.TransportGetFieldMappingsAction;
+import org.opensearch.action.admin.indices.mapping.get.TransportGetInferredFieldsAction;
 import org.opensearch.action.admin.indices.mapping.get.TransportGetFieldMappingsIndexAction;
 import org.opensearch.action.admin.indices.mapping.get.TransportGetMappingsAction;
 import org.opensearch.action.admin.indices.mapping.put.AutoPutMappingAction;
@@ -669,6 +671,7 @@ public class ActionModule extends AbstractModule {
         actions.register(IndicesExistsAction.INSTANCE, TransportIndicesExistsAction.class);
         actions.register(AddIndexBlockAction.INSTANCE, TransportAddIndexBlockAction.class);
         actions.register(GetMappingsAction.INSTANCE, TransportGetMappingsAction.class);
+        actions.register(GetInferredFieldsAction.INSTANCE, TransportGetInferredFieldsAction.class);
         actions.register(
             GetFieldMappingsAction.INSTANCE,
             TransportGetFieldMappingsAction.class,
