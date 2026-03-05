@@ -168,6 +168,8 @@ import org.opensearch.action.admin.indices.mapping.get.TransportGetFieldMappings
 import org.opensearch.action.admin.indices.mapping.get.TransportGetInferredFieldsAction;
 import org.opensearch.action.admin.indices.mapping.get.TransportGetFieldMappingsIndexAction;
 import org.opensearch.action.admin.indices.mapping.get.TransportGetMappingsAction;
+import org.opensearch.action.admin.indices.maxfieldcount.GetMaxFieldCountAction;
+import org.opensearch.action.admin.indices.maxfieldcount.TransportGetMaxFieldCountAction;
 import org.opensearch.action.admin.indices.mapping.put.AutoPutMappingAction;
 import org.opensearch.action.admin.indices.mapping.put.PutMappingAction;
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest;
@@ -399,6 +401,7 @@ import org.opensearch.rest.action.admin.indices.RestGetFieldMappingAction;
 import org.opensearch.rest.action.admin.indices.RestGetIndexTemplateAction;
 import org.opensearch.rest.action.admin.indices.RestGetIndicesAction;
 import org.opensearch.rest.action.admin.indices.RestGetMappingAction;
+import org.opensearch.rest.action.admin.indices.RestGetMaxFieldCountAction;
 import org.opensearch.rest.action.admin.indices.RestGetSettingsAction;
 import org.opensearch.rest.action.admin.indices.RestIndexDeleteAliasesAction;
 import org.opensearch.rest.action.admin.indices.RestIndexPutAliasAction;
@@ -672,6 +675,7 @@ public class ActionModule extends AbstractModule {
         actions.register(AddIndexBlockAction.INSTANCE, TransportAddIndexBlockAction.class);
         actions.register(GetMappingsAction.INSTANCE, TransportGetMappingsAction.class);
         actions.register(GetInferredFieldsAction.INSTANCE, TransportGetInferredFieldsAction.class);
+        actions.register(GetMaxFieldCountAction.INSTANCE, TransportGetMaxFieldCountAction.class);
         actions.register(
             GetFieldMappingsAction.INSTANCE,
             TransportGetFieldMappingsAction.class,
@@ -885,6 +889,7 @@ public class ActionModule extends AbstractModule {
 
         registerHandler.accept(new RestPutMappingAction());
         registerHandler.accept(new RestGetMappingAction(threadPool));
+        registerHandler.accept(new RestGetMaxFieldCountAction());
         registerHandler.accept(new RestGetFieldMappingAction());
 
         registerHandler.accept(new RestRefreshAction());
