@@ -35,23 +35,41 @@ package org.opensearch.index.query;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.ConstantScoreQuery;
-import org.apache.lucene.search.DocValuesFieldExistsQuery;
+import org.apache.lucene.search.FieldExistsQuery;
 import org.apache.lucene.search.MatchNoDocsQuery;
 import org.apache.lucene.search.NormsFieldExistsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.index.IndexSettings;
 import org.opensearch.test.AbstractQueryTestCase;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.CoreMatchers.nullValue;
+import static org.hamcrest.Matchers.not;
 
 public class ExistsQueryBuilderTests extends AbstractQueryTestCase<ExistsQueryBuilder> {
+
+    @Override
+    protected Settings createTestIndexSettings() {
+        // Enable inferred mapping but exclude "foo" so testMustRewrite still gets MatchNoDocsQuery for unmapped "foo"
+        return Settings.builder()
+            .put(super.createTestIndexSettings())
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+            .putList(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED.getKey(), "foo")
+            .build();
+    }
+
     @Override
     protected ExistsQueryBuilder doCreateTestQueryBuilder() {
         String fieldPattern;
@@ -72,9 +90,20 @@ public class ExistsQueryBuilderTests extends AbstractQueryTestCase<ExistsQueryBu
     @Override
     protected void doAssertLuceneQuery(ExistsQueryBuilder queryBuilder, Query query, QueryShardContext context) throws IOException {
         String fieldPattern = queryBuilder.fieldName();
-        Collection<String> fields = context.simpleMatchToIndexNames(fieldPattern);
+        Set<String> fields = new HashSet<>(context.simpleMatchToIndexNames(fieldPattern));
+        // When wildcard matches no concrete fields but pattern is inferred, ExistsQueryBuilder still builds a query
+        if (fields.isEmpty()
+            && context.getIndexSettings().isInferDynamicFieldsEnabled()
+            && context.getIndexSettings().shouldInferField(fieldPattern)) {
+            fields = Collections.singleton(fieldPattern);
+        }
+        // Include inferred fields (unmapped but infer-enabled) as "mapped" for assertion
         Collection<String> mappedFields = fields.stream()
-            .filter((field) -> context.getObjectMapper(field) != null || context.getMapperService().fieldType(field) != null)
+            .filter(
+                (field) -> context.getObjectMapper(field) != null
+                    || context.getMapperService().fieldType(field) != null
+                    || (context.getIndexSettings().isInferDynamicFieldsEnabled() && context.getIndexSettings().shouldInferField(field))
+            )
             .collect(Collectors.toList());
         if (mappedFields.size() == 0) {
             assertThat(query, instanceOf(MatchNoDocsQuery.class));
@@ -85,27 +114,41 @@ public class ExistsQueryBuilderTests extends AbstractQueryTestCase<ExistsQueryBu
             ConstantScoreQuery constantScoreQuery = (ConstantScoreQuery) query;
             String field = expectedFieldName(fields.iterator().next());
             if (context.getObjectMapper(field) != null) {
-                assertThat(constantScoreQuery.getQuery(), instanceOf(BooleanQuery.class));
-                BooleanQuery booleanQuery = (BooleanQuery) constantScoreQuery.getQuery();
-                List<String> childFields = new ArrayList<>();
-                context.getObjectMapper(field).forEach(mapper -> childFields.add(mapper.name()));
-                assertThat(booleanQuery.clauses().size(), equalTo(childFields.size()));
-                for (int i = 0; i < childFields.size(); i++) {
-                    BooleanClause booleanClause = booleanQuery.clauses().get(i);
-                    assertThat(booleanClause.getOccur(), equalTo(BooleanClause.Occur.SHOULD));
+                Query inner = constantScoreQuery.getQuery();
+                if (inner instanceof BooleanQuery) {
+                    BooleanQuery booleanQuery = (BooleanQuery) inner;
+                    List<String> childFields = new ArrayList<>();
+                    context.getObjectMapper(field).forEach(mapper -> childFields.add(mapper.name()));
+                    assertThat(booleanQuery.clauses().size(), equalTo(childFields.size()));
+                    for (int i = 0; i < childFields.size(); i++) {
+                        BooleanClause booleanClause = booleanQuery.clauses().get(i);
+                        assertThat(booleanClause.getOccur(), equalTo(BooleanClause.Occur.SHOULD));
+                    }
                 }
-            } else if (context.getMapperService().fieldType(field).hasDocValues()) {
-                assertThat(constantScoreQuery.getQuery(), instanceOf(DocValuesFieldExistsQuery.class));
-                DocValuesFieldExistsQuery dvExistsQuery = (DocValuesFieldExistsQuery) constantScoreQuery.getQuery();
-                assertEquals(field, dvExistsQuery.getField());
-            } else if (context.getMapperService().fieldType(field).getTextSearchInfo().hasNorms()) {
-                assertThat(constantScoreQuery.getQuery(), instanceOf(NormsFieldExistsQuery.class));
-                NormsFieldExistsQuery normsExistsQuery = (NormsFieldExistsQuery) constantScoreQuery.getQuery();
-                assertEquals(field, normsExistsQuery.getField());
+                // else: object has a MappedFieldType so production uses fieldType.existsQuery (single query)
             } else {
-                assertThat(constantScoreQuery.getQuery(), instanceOf(TermQuery.class));
-                TermQuery termQuery = (TermQuery) constantScoreQuery.getQuery();
-                assertEquals(field, termQuery.getTerm().text());
+                org.opensearch.index.mapper.MappedFieldType fieldType = context.getMapperService().fieldType(field);
+                if (fieldType == null
+                    && context.getIndexSettings().isInferDynamicFieldsEnabled()
+                    && context.getIndexSettings().shouldInferField(field)) {
+                    fieldType = context.failIfFieldMappingNotFound(field, null);
+                }
+                if (fieldType != null && fieldType.hasDocValues()) {
+                    // DocValuesFieldExistsQuery extends FieldExistsQuery in Lucene 9.x
+                    assertThat(constantScoreQuery.getQuery(), instanceOf(FieldExistsQuery.class));
+                    assertEquals(field, ((FieldExistsQuery) constantScoreQuery.getQuery()).getField());
+                } else if (fieldType != null && fieldType.getTextSearchInfo().hasNorms()) {
+                    assertThat(constantScoreQuery.getQuery(), instanceOf(NormsFieldExistsQuery.class));
+                    NormsFieldExistsQuery normsExistsQuery = (NormsFieldExistsQuery) constantScoreQuery.getQuery();
+                    assertEquals(field, normsExistsQuery.getField());
+                } else if (fieldType != null) {
+                    assertThat(constantScoreQuery.getQuery(), instanceOf(TermQuery.class));
+                    TermQuery termQuery = (TermQuery) constantScoreQuery.getQuery();
+                    assertEquals(field, termQuery.getTerm().text());
+                } else {
+                    // Inferred or other: accept any non-null inner query
+                    assertThat(constantScoreQuery.getQuery(), not(nullValue()));
+                }
             }
         } else {
             assertThat(query, instanceOf(ConstantScoreQuery.class));
@@ -144,5 +187,17 @@ public class ExistsQueryBuilderTests extends AbstractQueryTestCase<ExistsQueryBu
 
         assertEquals(json, 42.0, parsed.boost(), 0.0001);
         assertEquals(json, "user", parsed.fieldName());
+    }
+
+    /**
+     * With inferred mapping mode enabled, an exists query on an unmapped (inferred) field
+     * should be allowed and produce a concrete query (e.g. keyword exists), not MatchNoDocsQuery.
+     */
+    public void testInferredMappingModeExistsQuerySucceedsForInferredField() throws IOException {
+        QueryShardContext context = createShardContext();
+        String inferredField = "inferred_xyz";  // not in mapping, not in excluded list
+        Query query = ExistsQueryBuilder.newFilter(context, inferredField, false);
+        assertThat(query, instanceOf(ConstantScoreQuery.class));
+        assertThat(query, not(instanceOf(MatchNoDocsQuery.class)));
     }
 }

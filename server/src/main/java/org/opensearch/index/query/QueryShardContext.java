@@ -63,6 +63,7 @@ import org.opensearch.index.mapper.DerivedFieldResolver;
 import org.opensearch.index.mapper.DerivedFieldResolverFactory;
 import org.opensearch.index.mapper.DerivedFieldType;
 import org.opensearch.index.mapper.DocumentMapper;
+import org.opensearch.index.mapper.KeywordFieldMapper;
 import org.opensearch.index.mapper.MappedFieldType;
 import org.opensearch.index.mapper.Mapper;
 import org.opensearch.index.mapper.MapperService;
@@ -515,6 +516,11 @@ public class QueryShardContext extends QueryRewriteContext {
             return fieldMapping;
         } else if ((fieldMapping = resolveDerivedFieldType(name)) != null) {
             return fieldMapping;
+        } else if (indexSettings.isInferDynamicFieldsEnabled() && indexSettings.shouldInferField(name)) {
+            // Inferred mapping mode: treat unmapped fields as keywords
+            // Note: Currently only "keyword" type is supported for inferred fields
+            KeywordFieldMapper.Builder builder = new KeywordFieldMapper.Builder(name);
+            return builder.build(new Mapper.BuilderContext(indexSettings.getSettings(), new ContentPath(1))).fieldType();
         } else if (allowUnmappedFields) {
             return fieldMapping;
         } else if (mapUnmappedFieldAsString) {

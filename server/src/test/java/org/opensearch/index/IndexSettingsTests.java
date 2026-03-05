@@ -53,6 +53,7 @@ import org.opensearch.test.VersionUtils;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -1062,5 +1063,73 @@ public class IndexSettingsTests extends OpenSearchTestCase {
         Settings nodeSettings = Settings.builder().put("node.attr.remote_store.translog.repository", "my-repo-1").build();
         IndexSettings settings = newIndexSettings(newIndexMeta("index", theSettings), nodeSettings);
         assertTrue("Index should be on remote node", settings.isAssignedOnRemoteNode());
+    }
+
+    // Inferred mapping mode (index.mapping.infer_dynamic_fields.*)
+
+    public void testInferDynamicFieldsDefault() {
+        IndexMetadata metadata = newIndexMeta("index", Settings.EMPTY);
+        IndexSettings settings = new IndexSettings(metadata, Settings.EMPTY);
+        assertFalse(settings.isInferDynamicFieldsEnabled());
+        assertTrue(settings.getInferDynamicFieldsExcluded().isEmpty());
+        assertFalse(settings.shouldInferField("any_field"));
+    }
+
+    public void testInferDynamicFieldsEnabled() {
+        IndexMetadata metadata = newIndexMeta(
+            "index",
+            Settings.builder()
+                .put(IndexMetadata.SETTING_VERSION_CREATED, Version.CURRENT)
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+                .build()
+        );
+        IndexSettings settings = new IndexSettings(metadata, Settings.EMPTY);
+        assertTrue(settings.isInferDynamicFieldsEnabled());
+        assertTrue(settings.shouldInferField("tag_foo"));
+        assertTrue(settings.shouldInferField("unknown"));
+    }
+
+    public void testInferDynamicFieldsExcluded() {
+        IndexMetadata metadata = newIndexMeta(
+            "index",
+            Settings.builder()
+                .put(IndexMetadata.SETTING_VERSION_CREATED, Version.CURRENT)
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+                .putList(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED.getKey(), "timestamp", "count")
+                .build()
+        );
+        IndexSettings settings = new IndexSettings(metadata, Settings.EMPTY);
+        assertTrue(settings.isInferDynamicFieldsEnabled());
+        assertEquals(Set.of("timestamp", "count"), settings.getInferDynamicFieldsExcluded());
+        assertTrue(settings.shouldInferField("tag_foo"));
+        assertFalse(settings.shouldInferField("timestamp"));
+        assertFalse(settings.shouldInferField("count"));
+    }
+
+    public void testInferDynamicFieldsDynamicUpdate() {
+        IndexMetadata metadata = newIndexMeta(
+            "index",
+            Settings.builder()
+                .put(IndexMetadata.SETTING_VERSION_CREATED, Version.CURRENT)
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false)
+                .build()
+        );
+        IndexSettings settings = new IndexSettings(metadata, Settings.EMPTY);
+        assertFalse(settings.isInferDynamicFieldsEnabled());
+
+        settings.updateIndexMetadata(
+            newIndexMeta(
+                "index",
+                Settings.builder()
+                    .put(IndexMetadata.SETTING_VERSION_CREATED, Version.CURRENT)
+                    .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+                    .putList(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED.getKey(), "foo")
+                    .build()
+            )
+        );
+        assertTrue(settings.isInferDynamicFieldsEnabled());
+        assertEquals(Set.of("foo"), settings.getInferDynamicFieldsExcluded());
+        assertTrue(settings.shouldInferField("bar"));
+        assertFalse(settings.shouldInferField("foo"));
     }
 }

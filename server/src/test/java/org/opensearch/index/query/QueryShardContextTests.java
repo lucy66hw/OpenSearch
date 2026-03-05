@@ -66,6 +66,7 @@ import org.opensearch.index.fielddata.plain.AbstractLeafOrdinalsFieldData;
 import org.opensearch.index.mapper.DerivedFieldResolver;
 import org.opensearch.index.mapper.DerivedFieldType;
 import org.opensearch.index.mapper.IndexFieldMapper;
+import org.opensearch.index.mapper.KeywordFieldMapper;
 import org.opensearch.index.mapper.MappedFieldType;
 import org.opensearch.index.mapper.MapperService;
 import org.opensearch.index.mapper.TextFieldMapper;
@@ -118,6 +119,31 @@ public class QueryShardContextTests extends OpenSearchTestCase {
         assertThat(result, notNullValue());
         assertThat(result, instanceOf(TextFieldMapper.TextFieldType.class));
         assertThat(result.name(), equalTo("name"));
+    }
+
+    public void testInferredMappingModeReturnsKeywordFieldType() {
+        Settings inferSettings = Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true).build();
+        QueryShardContext context = createQueryShardContextWithSettings(inferSettings);
+        context.setAllowUnmappedFields(false);
+        MappedFieldType result = context.failIfFieldMappingNotFound("inferred_field", null);
+        assertThat(result, notNullValue());
+        assertThat(result, instanceOf(KeywordFieldMapper.KeywordFieldType.class));
+        assertThat(result.name(), equalTo("inferred_field"));
+    }
+
+    public void testInferredMappingModeExcludedFieldNotInferred() {
+        Settings inferSettings = Settings.builder()
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+            .putList(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED.getKey(), "excluded_ts")
+            .build();
+        QueryShardContext context = createQueryShardContextWithSettings(inferSettings);
+        context.setAllowUnmappedFields(false);
+        QueryShardException e = expectThrows(QueryShardException.class, () -> context.failIfFieldMappingNotFound("excluded_ts", null));
+        assertEquals("No field mapping can be found for the field with name [excluded_ts]", e.getMessage());
+    }
+
+    private static QueryShardContext createQueryShardContextWithSettings(Settings additionalIndexSettings) {
+        return createQueryShardContext(IndexMetadata.INDEX_UUID_NA_VALUE, null, null, additionalIndexSettings);
     }
 
     public void testDerivedFieldMapping() {
@@ -329,13 +355,22 @@ public class QueryShardContextTests extends OpenSearchTestCase {
     }
 
     public static QueryShardContext createQueryShardContext(String indexUuid, String clusterAlias) {
-        return createQueryShardContext(indexUuid, clusterAlias, null);
+        return createQueryShardContext(indexUuid, clusterAlias, null, Settings.EMPTY);
     }
 
     private static QueryShardContext createQueryShardContext(
         String indexUuid,
         String clusterAlias,
         TriFunction<String, LeafSearchLookup, Integer, String> runtimeDocValues
+    ) {
+        return createQueryShardContext(indexUuid, clusterAlias, runtimeDocValues, Settings.EMPTY);
+    }
+
+    private static QueryShardContext createQueryShardContext(
+        String indexUuid,
+        String clusterAlias,
+        TriFunction<String, LeafSearchLookup, Integer, String> runtimeDocValues,
+        Settings additionalIndexSettings
     ) {
         IndexMetadata.Builder indexMetadataBuilder = new IndexMetadata.Builder("index");
         indexMetadataBuilder.settings(
@@ -344,6 +379,7 @@ public class QueryShardContextTests extends OpenSearchTestCase {
                 .put("index.number_of_shards", 1)
                 .put("index.number_of_replicas", 1)
                 .put(IndexMetadata.SETTING_INDEX_UUID, indexUuid)
+                .put(additionalIndexSettings)
         );
         IndexMetadata indexMetadata = indexMetadataBuilder.build();
         IndexSettings indexSettings = new IndexSettings(indexMetadata, Settings.EMPTY);

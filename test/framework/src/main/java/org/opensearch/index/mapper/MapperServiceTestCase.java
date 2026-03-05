@@ -134,8 +134,16 @@ public abstract class MapperServiceTestCase extends OpenSearchTestCase {
      * Create a {@link MapperService} like we would for an index.
      */
     protected final MapperService createMapperService(Version version, XContentBuilder mapping) throws IOException {
+        return createMapperService(version, Settings.EMPTY, mapping);
+    }
+
+    /**
+     * Create a {@link MapperService} with additional index-level settings (e.g. for inferred mapping mode).
+     */
+    protected final MapperService createMapperService(Version version, Settings additionalIndexSettings, XContentBuilder mapping)
+        throws IOException {
         IndexMetadata meta = IndexMetadata.builder("index")
-            .settings(Settings.builder().put("index.version.created", version))
+            .settings(Settings.builder().put("index.version.created", version).put(additionalIndexSettings))
             .numberOfReplicas(0)
             .numberOfShards(1)
             .build();

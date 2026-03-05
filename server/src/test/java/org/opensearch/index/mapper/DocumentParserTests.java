@@ -376,22 +376,27 @@ public class DocumentParserTests extends MapperServiceTestCase {
     }
 
     public void testEmptyMappingUpdate() throws Exception {
-        DocumentMapper docMapper = createDummyMapping();
-        assertNull(DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, Collections.emptyList()));
+        MapperService mapperService = createMapperService();
+        DocumentMapper docMapper = mapperService.documentMapper();
+        assertNull(
+            DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, Collections.emptyList(), mapperService.getIndexSettings())
+        );
     }
 
     public void testSingleMappingUpdate() throws Exception {
-        DocumentMapper docMapper = createDummyMapping();
+        MapperService mapperService = createMapperService();
+        DocumentMapper docMapper = mapperService.documentMapper();
         List<Mapper> updates = Collections.singletonList(new MockFieldMapper("foo"));
-        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates);
+        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates, mapperService.getIndexSettings());
         assertNotNull(mapping);
         assertNotNull(mapping.root().getMapper("foo"));
     }
 
     public void testSubfieldMappingUpdate() throws Exception {
-        DocumentMapper docMapper = createDummyMapping();
+        MapperService mapperService = createMapperService();
+        DocumentMapper docMapper = mapperService.documentMapper();
         List<Mapper> updates = Collections.singletonList(new MockFieldMapper("x.foo"));
-        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates);
+        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates, mapperService.getIndexSettings());
         assertNotNull(mapping);
         Mapper xMapper = mapping.root().getMapper("x");
         assertNotNull(xMapper);
@@ -401,11 +406,12 @@ public class DocumentParserTests extends MapperServiceTestCase {
     }
 
     public void testMultipleSubfieldMappingUpdate() throws Exception {
-        DocumentMapper docMapper = createDummyMapping();
+        MapperService mapperService = createMapperService();
+        DocumentMapper docMapper = mapperService.documentMapper();
         List<Mapper> updates = new ArrayList<>();
         updates.add(new MockFieldMapper("x.foo"));
         updates.add(new MockFieldMapper("x.bar"));
-        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates);
+        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates, mapperService.getIndexSettings());
         assertNotNull(mapping);
         Mapper xMapper = mapping.root().getMapper("x");
         assertNotNull(xMapper);
@@ -416,9 +422,10 @@ public class DocumentParserTests extends MapperServiceTestCase {
     }
 
     public void testDeepSubfieldMappingUpdate() throws Exception {
-        DocumentMapper docMapper = createDummyMapping();
+        MapperService mapperService = createMapperService();
+        DocumentMapper docMapper = mapperService.documentMapper();
         List<Mapper> updates = Collections.singletonList(new MockFieldMapper("x.subx.foo"));
-        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates);
+        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates, mapperService.getIndexSettings());
         assertNotNull(mapping);
         Mapper xMapper = mapping.root().getMapper("x");
         assertNotNull(xMapper);
@@ -430,11 +437,12 @@ public class DocumentParserTests extends MapperServiceTestCase {
     }
 
     public void testDeepSubfieldAfterSubfieldMappingUpdate() throws Exception {
-        DocumentMapper docMapper = createDummyMapping();
+        MapperService mapperService = createMapperService();
+        DocumentMapper docMapper = mapperService.documentMapper();
         List<Mapper> updates = new ArrayList<>();
         updates.add(new MockFieldMapper("x.a"));
         updates.add(new MockFieldMapper("x.subx.b"));
-        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates);
+        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates, mapperService.getIndexSettings());
         assertNotNull(mapping);
         Mapper xMapper = mapping.root().getMapper("x");
         assertNotNull(xMapper);
@@ -453,7 +461,7 @@ public class DocumentParserTests extends MapperServiceTestCase {
         updates.add(createObjectMapper(mapperService, "foo.bar"));
         updates.add(new MockFieldMapper("foo.bar.baz"));
         updates.add(new MockFieldMapper("foo.field"));
-        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates);
+        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates, mapperService.getIndexSettings());
         assertNotNull(mapping);
         Mapper fooMapper = mapping.root().getMapper("foo");
         assertNotNull(fooMapper);
@@ -462,6 +470,46 @@ public class DocumentParserTests extends MapperServiceTestCase {
         Mapper barMapper = ((ObjectMapper) fooMapper).getMapper("bar");
         assertTrue(barMapper instanceof ObjectMapper);
         assertNotNull(((ObjectMapper) barMapper).getMapper("baz"));
+    }
+
+    /** Inferred mapping mode: dynamic update filters out inferred fields (no cluster state update for them). */
+    public void testInferredMappingModeCreateDynamicUpdateFiltersInferredFields() throws Exception {
+        Settings inferSettings = Settings.builder()
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+            .putList(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED.getKey(), "excluded_field")
+            .build();
+        MapperService mapperService = createMapperService(Version.CURRENT, inferSettings, mapping(b -> {}));
+        DocumentMapper docMapper = mapperService.documentMapper();
+        List<Mapper> updates = new ArrayList<>();
+        updates.add(new MockFieldMapper("inferred_tag"));
+        updates.add(new MockFieldMapper("another_inferred"));
+        updates.add(new MockFieldMapper("excluded_field"));
+        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates, mapperService.getIndexSettings());
+        assertNotNull(mapping);
+        assertNull(mapping.root().getMapper("inferred_tag"));
+        assertNull(mapping.root().getMapper("another_inferred"));
+        assertNotNull(mapping.root().getMapper("excluded_field"));
+    }
+
+    /** Inferred mapping mode: when all dynamic fields are inferred, no mapping update. */
+    public void testInferredMappingModeCreateDynamicUpdateAllInferredReturnsNull() throws Exception {
+        Settings inferSettings = Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true).build();
+        MapperService mapperService = createMapperService(Version.CURRENT, inferSettings, mapping(b -> {}));
+        DocumentMapper docMapper = mapperService.documentMapper();
+        List<Mapper> updates = new ArrayList<>();
+        updates.add(new MockFieldMapper("tag1"));
+        updates.add(new MockFieldMapper("tag2"));
+        Mapping mapping = DocumentParser.createDynamicUpdate(docMapper.mapping(), docMapper, updates, mapperService.getIndexSettings());
+        assertNull(mapping);
+    }
+
+    /** Inferred mapping mode: parse dynamic string field indexes as keyword and produces no mapping update. */
+    public void testInferredMappingModeParseDynamicStringAsKeywordNoMappingUpdate() throws Exception {
+        Settings inferSettings = Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true).build();
+        DocumentMapper mapper = createMapperService(Version.CURRENT, inferSettings, mapping(b -> {})).documentMapper();
+        ParsedDocument doc = mapper.parse(source(b -> b.field("dynamic_tag", "value")));
+        assertNull(doc.dynamicMappingsUpdate());
+        assertNotNull(doc.rootDoc().getField("dynamic_tag"));
     }
 
     public void testDynamicGeoPointArrayWithTemplate() throws Exception {

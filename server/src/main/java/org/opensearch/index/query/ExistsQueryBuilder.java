@@ -187,12 +187,20 @@ public class ExistsQueryBuilder extends AbstractQueryBuilder<ExistsQueryBuilder>
     private static Query newFieldExistsQuery(QueryShardContext context, String field) {
         MappedFieldType fieldType = context.getMapperService().fieldType(field);
         if (fieldType == null) {
-            // The field does not exist as a leaf but could be an object so
-            // check for an object mapper
-            if (context.getObjectMapper(field) != null) {
-                return newObjectFieldExistsQuery(context, field);
+            // Check if this is an inferred field (schema-on-read mode)
+            if (context.getIndexSettings().isInferDynamicFieldsEnabled() && context.getIndexSettings().shouldInferField(field)) {
+                // Create inferred field type on the fly
+                fieldType = context.failIfFieldMappingNotFound(field, null);
             }
-            return Queries.newMatchNoDocsQuery("User requested \"match_none\" query.");
+
+            if (fieldType == null) {
+                // The field does not exist as a leaf but could be an object so
+                // check for an object mapper
+                if (context.getObjectMapper(field) != null) {
+                    return newObjectFieldExistsQuery(context, field);
+                }
+                return Queries.newMatchNoDocsQuery("User requested \"match_none\" query.");
+            }
         }
         Query filter = fieldType.existsQuery(context);
         return new ConstantScoreQuery(filter);
@@ -236,10 +244,25 @@ public class ExistsQueryBuilder extends AbstractQueryBuilder<ExistsQueryBuilder>
             fields = context.simpleMatchToIndexNames(fieldPattern);
         }
 
+        // Check if fields is empty - could be an inferred field
+        if (fields.isEmpty()) {
+            // Check if this is an inferred field (schema-on-read mode)
+            if (context.getIndexSettings().isInferDynamicFieldsEnabled() && context.getIndexSettings().shouldInferField(fieldPattern)) {
+                // Field is inferred, allow exists query to proceed
+                return Collections.singleton(fieldPattern);
+            }
+            return Collections.emptySet();
+        }
+
         if (fields.size() == 1) {
             String field = fields.iterator().next();
             MappedFieldType fieldType = context.fieldMapper(field);
             if (fieldType == null) {
+                // Check if this is an inferred field (schema-on-read mode)
+                if (context.getIndexSettings().isInferDynamicFieldsEnabled() && context.getIndexSettings().shouldInferField(field)) {
+                    // Field is inferred, allow exists query to proceed
+                    return Collections.singleton(field);
+                }
                 return Collections.emptySet();
             }
         }

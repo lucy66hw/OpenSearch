@@ -244,6 +244,8 @@ public final class IndexScopedSettings extends AbstractScopedSettings {
                 IndexSettings.INDEX_CONCURRENT_SEGMENT_SEARCH_MODE,
                 IndexSettings.INDEX_CONCURRENT_SEGMENT_SEARCH_MAX_SLICE_COUNT,
                 IndexSettings.ALLOW_DERIVED_FIELDS,
+                IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED,
+                IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED,
 
                 // Settings for star tree index
                 StarTreeIndexSettings.STAR_TREE_DEFAULT_MAX_LEAF_DOCS,

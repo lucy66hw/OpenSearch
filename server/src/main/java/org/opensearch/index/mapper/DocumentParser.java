@@ -102,7 +102,11 @@ final class DocumentParser {
 
         context.postParse();
 
-        return parsedDocument(source, context, createDynamicUpdate(mapping, docMapper, context.getDynamicMappers()));
+        return parsedDocument(
+            source,
+            context,
+            createDynamicUpdate(mapping, docMapper, context.getDynamicMappers(), context.indexSettings())
+        );
     }
 
     private static boolean containsDisabledObjectMapper(ObjectMapper objectMapper, String[] subfields) {
@@ -230,10 +234,35 @@ final class DocumentParser {
     }
 
     /** Creates a Mapping containing any dynamically added fields, or returns null if there were no dynamic mappings. */
-    static Mapping createDynamicUpdate(Mapping mapping, DocumentMapper docMapper, List<Mapper> dynamicMappers) {
+    static Mapping createDynamicUpdate(
+        Mapping mapping,
+        DocumentMapper docMapper,
+        List<Mapper> dynamicMappers,
+        IndexSettings indexSettings
+    ) {
         if (dynamicMappers.isEmpty()) {
             return null;
         }
+
+        // Filter out inferred fields from cluster state mapping updates
+        if (indexSettings.isInferDynamicFieldsEnabled()) {
+            List<Mapper> mappersToAdd = new ArrayList<>();
+            for (Mapper mapper : dynamicMappers) {
+                String fieldName = mapper.simpleName();
+
+                // Only add to mapping if field is excluded (not inferred)
+                if (!indexSettings.shouldInferField(fieldName)) {
+                    mappersToAdd.add(mapper);
+                }
+            }
+            dynamicMappers = mappersToAdd;
+
+            // If all fields were inferred, no mapping update needed
+            if (dynamicMappers.isEmpty()) {
+                return null;
+            }
+        }
+
         // We build a mapping by first sorting the mappers, so that all mappers containing a common prefix
         // will be processed in a contiguous block. When the prefix is no longer seen, we pop the extra elements
         // off the stack, merging them upwards into the existing mappers.
@@ -764,6 +793,14 @@ final class DocumentParser {
         ObjectMapper.Dynamic dynamic,
         String fullPath
     ) throws IOException {
+        // Check if this field should be inferred (schema-on-read mode)
+        IndexSettings indexSettings = context.indexSettings();
+        if (indexSettings.isInferDynamicFieldsEnabled() && indexSettings.shouldInferField(currentFieldName)) {
+            // Always use keyword type for inferred fields
+            // Note: Currently only "keyword" type is supported for inferred fields
+            return new KeywordFieldMapper.Builder(currentFieldName);
+        }
+
         if (token == XContentParser.Token.VALUE_STRING) {
             String text = context.parser().text();
 

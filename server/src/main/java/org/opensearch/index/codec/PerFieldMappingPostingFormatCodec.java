@@ -87,7 +87,12 @@ public class PerFieldMappingPostingFormatCodec extends Lucene912Codec {
     public PostingsFormat getPostingsFormatForField(String field) {
         final MappedFieldType fieldType = mapperService.fieldType(field);
         if (fieldType == null) {
-            logger.warn("no index mapper found for field: [{}] returning default postings format", field);
+            // Suppress warning for inferred fields (expected behavior in inferred mapping mode)
+            boolean isInferredField = mapperService.getIndexSettings().isInferDynamicFieldsEnabled()
+                && mapperService.getIndexSettings().shouldInferField(field);
+            if (!isInferredField) {
+                logger.warn("no index mapper found for field: [{}] returning default postings format", field);
+            }
         } else if (fieldType instanceof CompletionFieldMapper.CompletionFieldType) {
             return CompletionFieldMapper.CompletionFieldType.postingsFormat();
         } else if (IdFieldMapper.NAME.equals(field) && mapperService.getIndexSettings().isEnableFuzzySetForDocId()) {

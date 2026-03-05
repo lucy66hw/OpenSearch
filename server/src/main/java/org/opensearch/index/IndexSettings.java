@@ -62,8 +62,10 @@ import org.opensearch.search.pipeline.SearchPipelineService;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -164,6 +166,34 @@ public final class IndexSettings {
         true,
         Property.Dynamic,
         Property.IndexScope
+    );
+
+    /**
+     * When enabled, dynamic fields are inferred as keyword type at query time
+     * without being added to cluster state mapping. This prevents mapping explosion
+     * for time series data with unbounded dynamic tags.
+     *
+     * This setting is dynamic to allow enabling on existing indices without reindexing.
+     * When enabled on an index with existing mappings, new fields will be inferred
+     * while existing mapped fields continue to work via their explicit mappings.
+     */
+    public static final Setting<Boolean> INDEX_INFER_DYNAMIC_FIELDS_ENABLED = Setting.boolSetting(
+        "index.mapping.infer_dynamic_fields.enabled",
+        false,
+        Property.IndexScope,
+        Property.Dynamic  // Can be changed on existing indices
+    );
+
+    /**
+     * List of field names that should NOT be inferred and must have explicit mappings.
+     * These are typically predefined fields with specific types (e.g., timestamps, counters).
+     */
+    public static final Setting<List<String>> INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED = Setting.listSetting(
+        "index.mapping.infer_dynamic_fields.excluded_fields",
+        Collections.emptyList(),
+        Function.identity(),
+        Property.IndexScope,
+        Property.Dynamic
     );
 
     public static final Setting<TimeValue> INDEX_TRANSLOG_SYNC_INTERVAL_SETTING = Setting.timeSetting(
@@ -831,6 +861,10 @@ public final class IndexSettings {
     private final boolean isTranslogMetadataEnabled;
     private volatile boolean allowDerivedField;
 
+    // Inferred mapping mode settings
+    private volatile boolean inferDynamicFieldsEnabled;
+    private volatile Set<String> inferDynamicFieldsExcluded;
+
     /**
      * The maximum age of a retention lease before it is considered expired.
      *
@@ -1015,6 +1049,13 @@ public final class IndexSettings {
         this.queryStringAllowLeadingWildcard = QUERY_STRING_ALLOW_LEADING_WILDCARD.get(nodeSettings);
         this.defaultAllowUnmappedFields = scopedSettings.get(ALLOW_UNMAPPED);
         this.allowDerivedField = scopedSettings.get(ALLOW_DERIVED_FIELDS);
+
+        // Initialize inferred mapping mode settings
+        this.inferDynamicFieldsEnabled = scopedSettings.get(INDEX_INFER_DYNAMIC_FIELDS_ENABLED);
+        this.inferDynamicFieldsExcluded = new HashSet<>(scopedSettings.get(INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED));
+        scopedSettings.addSettingsUpdateConsumer(INDEX_INFER_DYNAMIC_FIELDS_ENABLED, this::setInferDynamicFieldsEnabled);
+        scopedSettings.addSettingsUpdateConsumer(INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED, this::setInferDynamicFieldsExcluded);
+
         this.durability = scopedSettings.get(INDEX_TRANSLOG_DURABILITY_SETTING);
         defaultFields = scopedSettings.get(DEFAULT_FIELD_SETTING);
         syncInterval = INDEX_TRANSLOG_SYNC_INTERVAL_SETTING.get(settings);
@@ -2033,5 +2074,46 @@ public final class IndexSettings {
 
     public void setRemoteStoreTranslogRepository(String remoteStoreTranslogRepository) {
         this.remoteStoreTranslogRepository = remoteStoreTranslogRepository;
+    }
+
+    /**
+     * Returns true if inferred mapping mode is enabled for this index.
+     * When enabled, dynamic fields are inferred as keywords without being added to cluster state.
+     */
+    public boolean isInferDynamicFieldsEnabled() {
+        return inferDynamicFieldsEnabled;
+    }
+
+    /**
+     * Returns the set of field names that should be excluded from inference.
+     * These fields require explicit mappings in cluster state.
+     */
+    public Set<String> getInferDynamicFieldsExcluded() {
+        return Collections.unmodifiableSet(inferDynamicFieldsExcluded);
+    }
+
+    /**
+     * Checks if a field should be inferred (not explicitly mapped).
+     * A field is inferred if:
+     * 1. Inferred mapping mode is enabled
+     * 2. Field name is NOT in the excluded list
+     *
+     * @param fieldName The field name to check
+     * @return true if the field should be inferred as keyword
+     */
+    public boolean shouldInferField(String fieldName) {
+        return inferDynamicFieldsEnabled && !inferDynamicFieldsExcluded.contains(fieldName);
+    }
+
+    private void setInferDynamicFieldsEnabled(boolean enabled) {
+        this.inferDynamicFieldsEnabled = enabled;
+        logger.info("Inferred mapping mode {} for index {}", enabled ? "enabled" : "disabled", index.getName());
+    }
+
+    /** Accepts List because {@link #INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED} is a list setting; stored as Set for O(1) contains. */
+    private void setInferDynamicFieldsExcluded(List<String> excludedFields) {
+        this.inferDynamicFieldsExcluded = excludedFields == null || excludedFields.isEmpty()
+            ? Collections.emptySet()
+            : new HashSet<>(excludedFields);
     }
 }
