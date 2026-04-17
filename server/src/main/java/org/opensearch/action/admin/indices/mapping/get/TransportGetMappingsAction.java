@@ -37,10 +37,8 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.clustermanager.info.TransportClusterInfoAction;
 import org.opensearch.cluster.ClusterState;
-import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.metadata.MappingMetadata;
-import org.opensearch.index.IndexSettings;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
@@ -52,9 +50,7 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -116,22 +112,7 @@ public class TransportGetMappingsAction extends TransportClusterInfoAction<GetMa
                 listener.onResponse(new GetMappingsResponse(result));
                 return;
             }
-            // Only request inferred fields from indices that have inferred mapping mode enabled
-            List<String> indicesWithInferEnabled = new ArrayList<>();
-            for (String indexName : concreteIndices) {
-                IndexMetadata indexMetadata = state.metadata().index(indexName);
-                if (indexMetadata != null
-                    && IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.get(indexMetadata.getSettings())) {
-                    indicesWithInferEnabled.add(indexName);
-                }
-            }
-            if (indicesWithInferEnabled.isEmpty()) {
-                listener.onResponse(new GetMappingsResponse(result));
-                return;
-            }
-            GetInferredFieldsRequest inferredRequest = new GetInferredFieldsRequest(
-                indicesWithInferEnabled.toArray(new String[0])
-            );
+            GetInferredFieldsRequest inferredRequest = new GetInferredFieldsRequest(concreteIndices);
             transportGetInferredFieldsAction.execute(
                 task,
                 inferredRequest,

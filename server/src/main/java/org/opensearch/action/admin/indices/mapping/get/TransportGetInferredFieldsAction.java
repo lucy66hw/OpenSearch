@@ -27,7 +27,6 @@ import org.opensearch.core.action.support.DefaultShardOperationFailedException;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.index.shard.ShardId;
 import org.opensearch.index.IndexService;
-import org.opensearch.index.IndexSettings;
 import org.opensearch.index.engine.Engine;
 import org.opensearch.index.mapper.MapperService;
 import org.opensearch.index.shard.IndexShard;
@@ -128,13 +127,8 @@ public class TransportGetInferredFieldsAction extends TransportBroadcastAction<
             return new GetInferredFieldsShardResponse(shardId, Set.of());
         }
 
-        IndexSettings indexSettings = indexService.getIndexSettings();
-        if (indexSettings.isInferDynamicFieldsEnabled() == false) {
-            return new GetInferredFieldsShardResponse(shardId, Set.of());
-        }
-
         MapperService mapperService = indexService.mapperService();
-        Version indexVersion = indexSettings.getIndexVersionCreated();
+        Version indexVersion = indexService.getIndexSettings().getIndexVersionCreated();
         Set<String> inferred;
 
         try (Engine.Searcher searcher = indexShard.acquireSearcher("get_inferred_fields")) {
@@ -149,9 +143,7 @@ public class TransportGetInferredFieldsAction extends TransportBroadcastAction<
                 if (mapperService.fieldType(name) != null) {
                     continue;
                 }
-                if (indexSettings.shouldInferField(name)) {
-                    inferred.add(name);
-                }
+                inferred.add(name);
             }
         }
 
