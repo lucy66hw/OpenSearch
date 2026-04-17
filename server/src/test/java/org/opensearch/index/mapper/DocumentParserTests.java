@@ -32,7 +32,13 @@
 
 package org.opensearch.index.mapper;
 
+import org.apache.lucene.index.DocValuesType;
+import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.FieldInfos;
+import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.VectorEncoding;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.BytesRef;
 import org.opensearch.Version;
 import org.opensearch.cluster.metadata.IndexMetadata;
@@ -2048,6 +2054,128 @@ public class DocumentParserTests extends MapperServiceTestCase {
         Mapping update = doc.dynamicMappingsUpdate();
         assertNotNull(update); // dynamic mapping update
 
+    }
+
+    private static FieldInfos buildFieldInfos(String... fieldNames) {
+        FieldInfo[] infos = new FieldInfo[fieldNames.length];
+        for (int i = 0; i < fieldNames.length; i++) {
+            infos[i] = new FieldInfo(
+                fieldNames[i], i, false, false, false,
+                IndexOptions.DOCS, DocValuesType.NONE, -1,
+                Collections.emptyMap(), 0, 0, 0, 0,
+                VectorEncoding.FLOAT32, VectorSimilarityFunction.EUCLIDEAN, false, false
+            );
+        }
+        return new FieldInfos(infos);
+    }
+
+    /** Inferred mapping mode: new field rejected when Lucene field count reaches total_fields.limit. */
+    public void testInferredFieldLimitRejectsNewFieldWhenAtLimit() throws Exception {
+        Settings inferSettings = Settings.builder()
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+            .put(MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey(), 3)
+            .build();
+        MapperService mapperService = createMapperService(Version.CURRENT, inferSettings, mapping(b -> {}));
+        mapperService.getLuceneFieldTracker().setFieldInfos(buildFieldInfos("f1", "f2", "f3"));
+        DocumentMapper mapper = mapperService.documentMapper();
+
+        MapperParsingException e = expectThrows(
+            MapperParsingException.class,
+            () -> mapper.parse(source(b -> b.field("brand_new_field", "value")))
+        );
+        assertThat(e.getCause().getMessage(), containsString("Rejecting write"));
+        assertThat(e.getCause().getMessage(), containsString("limit of total fields [3]"));
+    }
+
+    /** Inferred mapping mode: existing field allowed even when at the limit. */
+    public void testInferredFieldLimitAllowsExistingFieldWhenAtLimit() throws Exception {
+        Settings inferSettings = Settings.builder()
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+            .put(MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey(), 3)
+            .build();
+        MapperService mapperService = createMapperService(Version.CURRENT, inferSettings, mapping(b -> {}));
+        mapperService.getLuceneFieldTracker().setFieldInfos(buildFieldInfos("f1", "f2", "existing_field"));
+        DocumentMapper mapper = mapperService.documentMapper();
+
+        ParsedDocument doc = mapper.parse(source(b -> b.field("existing_field", "value")));
+        assertNull(doc.dynamicMappingsUpdate());
+        assertNotNull(doc.rootDoc().getField("existing_field"));
+    }
+
+    /** Inferred mapping mode: new field rejected when Lucene field count exceeds total_fields.limit. */
+    public void testInferredFieldLimitRejectsNewFieldWhenExceedsLimit() throws Exception {
+        Settings inferSettings = Settings.builder()
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+            .put(MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey(), 5)
+            .build();
+        MapperService mapperService = createMapperService(Version.CURRENT, inferSettings, mapping(b -> {}));
+        mapperService.getLuceneFieldTracker().setFieldInfos(buildFieldInfos("a", "b", "c", "d", "e", "f", "g"));
+        DocumentMapper mapper = mapperService.documentMapper();
+
+        MapperParsingException e = expectThrows(
+            MapperParsingException.class,
+            () -> mapper.parse(source(b -> b.field("another_field", "value")))
+        );
+        assertThat(e.getCause().getMessage(), containsString("Rejecting write"));
+        assertThat(e.getCause().getMessage(), containsString("limit of total fields [5]"));
+        assertThat(e.getCause().getMessage(), containsString("current Lucene field count: [7]"));
+    }
+
+    /** Inferred mapping mode: write succeeds when Lucene field count is below total_fields.limit. */
+    public void testInferredFieldLimitAllowsWriteWhenUnderLimit() throws Exception {
+        Settings inferSettings = Settings.builder()
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+            .put(MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey(), 100)
+            .build();
+        MapperService mapperService = createMapperService(Version.CURRENT, inferSettings, mapping(b -> {}));
+        mapperService.getLuceneFieldTracker().setFieldInfos(buildFieldInfos("f1", "f2"));
+        DocumentMapper mapper = mapperService.documentMapper();
+
+        ParsedDocument doc = mapper.parse(source(b -> b.field("allowed_field", "value")));
+        assertNull(doc.dynamicMappingsUpdate());
+        assertNotNull(doc.rootDoc().getField("allowed_field"));
+    }
+
+    /** Inferred mapping mode: limit check does not apply when inferred mode is disabled. */
+    public void testFieldLimitNotEnforcedWhenInferredModeDisabled() throws Exception {
+        Settings normalSettings = Settings.builder()
+            .put(MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey(), 10)
+            .build();
+        MapperService mapperService = createMapperService(Version.CURRENT, normalSettings, mapping(b -> {}));
+        mapperService.getLuceneFieldTracker().setFieldInfos(buildFieldInfos("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"));
+        DocumentMapper mapper = mapperService.documentMapper();
+
+        ParsedDocument doc = mapper.parse(source(b -> b.field("normal_dynamic_field", "value")));
+        assertNotNull(doc.dynamicMappingsUpdate());
+    }
+
+    /** Inferred mapping mode: excluded fields bypass the Lucene field limit check. */
+    public void testInferredFieldLimitDoesNotApplyToExcludedFields() throws Exception {
+        Settings inferSettings = Settings.builder()
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+            .putList(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED.getKey(), "excluded_field")
+            .put(MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey(), 3)
+            .build();
+        MapperService mapperService = createMapperService(Version.CURRENT, inferSettings, mapping(b -> {}));
+        mapperService.getLuceneFieldTracker().setFieldInfos(buildFieldInfos("a", "b", "c", "d"));
+        DocumentMapper mapper = mapperService.documentMapper();
+
+        ParsedDocument doc = mapper.parse(source(b -> b.field("excluded_field", "value")));
+        assertNotNull(doc.dynamicMappingsUpdate());
+    }
+
+    /** Inferred mapping mode: empty FieldInfos (no refresh yet) allows writes. */
+    public void testInferredFieldLimitWithEmptyFieldInfosAllowsWrite() throws Exception {
+        Settings inferSettings = Settings.builder()
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+            .put(MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey(), 100)
+            .build();
+        MapperService mapperService = createMapperService(Version.CURRENT, inferSettings, mapping(b -> {}));
+        DocumentMapper mapper = mapperService.documentMapper();
+
+        ParsedDocument doc = mapper.parse(source(b -> b.field("first_field", "value")));
+        assertNull(doc.dynamicMappingsUpdate());
+        assertNotNull(doc.rootDoc().getField("first_field"));
     }
 
 }

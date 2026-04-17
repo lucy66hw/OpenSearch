@@ -4954,4 +4954,57 @@ public class IndexShardTests extends IndexShardTestCase {
         assertTrue(remoteSegmentStats.getTotalRejections() > 0);
         assertEquals(remoteSegmentTransferTracker.getRejectionCount(), remoteSegmentStats.getTotalRejections());
     }
+
+    public void testLuceneFieldTrackerUpdatedOnRefreshWhenInferredModeEnabled() throws IOException {
+        Settings settings = Settings.builder()
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+            .build();
+        IndexShard shard = newStartedShard(true, settings);
+
+        assertEquals(0, shard.mapperService().getLuceneFieldTracker().getFieldInfos().size());
+
+        indexDoc(shard, "_doc", "1", "{\"field1\": \"value1\", \"field2\": \"value2\"}");
+        shard.refresh("test");
+
+        int fieldCount = shard.mapperService().getLuceneFieldTracker().getFieldInfos().size();
+        assertTrue("Expected Lucene field count > 0 after refresh, got " + fieldCount, fieldCount > 0);
+
+        closeShards(shard);
+    }
+
+    public void testLuceneFieldTrackerNotUpdatedWhenInferredModeDisabled() throws IOException {
+        Settings settings = Settings.builder()
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false)
+            .build();
+        IndexShard shard = newStartedShard(true, settings);
+
+        indexDoc(shard, "_doc", "1", "{\"field1\": \"value1\", \"field2\": \"value2\"}");
+        shard.refresh("test");
+
+        assertEquals(0, shard.mapperService().getLuceneFieldTracker().getFieldInfos().size());
+
+        closeShards(shard);
+    }
+
+    public void testLuceneFieldTrackerCountIncreasesWithNewFields() throws IOException {
+        Settings settings = Settings.builder()
+            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+            .build();
+        IndexShard shard = newStartedShard(true, settings);
+
+        indexDoc(shard, "_doc", "1", "{\"fieldA\": \"val\"}");
+        shard.refresh("test");
+        int countAfterFirst = shard.mapperService().getLuceneFieldTracker().getFieldInfos().size();
+        assertTrue("Expected field count > 0", countAfterFirst > 0);
+
+        indexDoc(shard, "_doc", "2", "{\"fieldA\": \"val\", \"fieldB\": \"val\", \"fieldC\": \"val\"}");
+        shard.refresh("test");
+        int countAfterSecond = shard.mapperService().getLuceneFieldTracker().getFieldInfos().size();
+        assertTrue(
+            "Expected field count to increase from " + countAfterFirst + " but got " + countAfterSecond,
+            countAfterSecond > countAfterFirst
+        );
+
+        closeShards(shard);
+    }
 }

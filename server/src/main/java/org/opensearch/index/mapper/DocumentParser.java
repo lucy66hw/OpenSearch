@@ -32,7 +32,10 @@
 
 package org.opensearch.index.mapper;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.IndexableField;
 import org.opensearch.OpenSearchParseException;
 import org.opensearch.Version;
@@ -64,6 +67,8 @@ import static org.opensearch.index.mapper.FieldMapper.IGNORE_MALFORMED_SETTING;
  * @opensearch.internal
  */
 final class DocumentParser {
+
+    private static final Logger logger = LogManager.getLogger(DocumentParser.class);
 
     private final IndexSettings indexSettings;
     private final DocumentMapperParser docMapperParser;
@@ -796,6 +801,19 @@ final class DocumentParser {
         // Check if this field should be inferred (schema-on-read mode)
         IndexSettings indexSettings = context.indexSettings();
         if (indexSettings.isInferDynamicFieldsEnabled() && indexSettings.shouldInferField(currentFieldName)) {
+            long limit = indexSettings.getMappingTotalFieldsLimit();
+            FieldInfos fieldInfos = context.mapperService().getLuceneFieldTracker().getFieldInfos();
+            if (fieldInfos.size() >= limit && fieldInfos.fieldInfo(currentFieldName) == null) {
+                String message = "Rejecting write: limit of total fields ["
+                    + limit
+                    + "] has been exceeded while adding new inferred field ["
+                    + fullPath
+                    + "]; current Lucene field count: ["
+                    + fieldInfos.size()
+                    + "]";
+                logger.info(message);
+                throw new IllegalArgumentException(message);
+            }
             // Always use keyword type for inferred fields
             // Note: Currently only "keyword" type is supported for inferred fields
             return new KeywordFieldMapper.Builder(currentFieldName);

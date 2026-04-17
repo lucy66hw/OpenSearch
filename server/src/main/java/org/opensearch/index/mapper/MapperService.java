@@ -227,6 +227,8 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
 
     private final BooleanSupplier idFieldDataEnabled;
 
+    private final LuceneFieldTracker luceneFieldTracker;
+
     private volatile Set<CompositeMappedFieldType> compositeMappedFieldTypes;
     private volatile Set<String> fieldsPartOfCompositeMappings;
     private volatile Set<String> nestedFieldsPartOfCompositeMappings;
@@ -264,6 +266,7 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
         );
         this.mapperRegistry = mapperRegistry;
         this.idFieldDataEnabled = idFieldDataEnabled;
+        this.luceneFieldTracker = new LuceneFieldTracker();
 
         if (INDEX_MAPPER_DYNAMIC_SETTING.exists(indexSettings.getSettings())
             && indexSettings.getIndexVersionCreated().onOrAfter(LegacyESVersion.V_7_0_0)) {
@@ -273,6 +276,14 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
 
     public boolean hasNested() {
         return this.mapper != null && this.mapper.hasNestedObjects();
+    }
+
+    /**
+     * Returns the tracker used to enforce Lucene-level field limits when
+     * inferred mapping mode is enabled.
+     */
+    public LuceneFieldTracker getLuceneFieldTracker() {
+        return luceneFieldTracker;
     }
 
     public IndexAnalyzers getIndexAnalyzers() {

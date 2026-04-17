@@ -37,6 +37,7 @@ import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.index.CheckIndex;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.FilterDirectoryReader;
 import org.apache.lucene.index.IndexCommit;
 import org.apache.lucene.index.IndexFileNames;
@@ -2642,6 +2643,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         // time elapses after the engine is created above (pulling the config settings) until we set the engine reference, during
         // which settings changes could possibly have happened, so here we forcefully push any config changes to the new engine.
         onSettingsChanged();
+
         assert assertSequenceNumbersInCommit();
         recoveryState.validateCurrentStage(RecoveryState.Stage.TRANSLOG);
     }
@@ -4029,6 +4031,21 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
 
         internalRefreshListener.clear();
         internalRefreshListener.add(new RefreshMetricUpdater(refreshMetric));
+        internalRefreshListener.add(new ReferenceManager.RefreshListener() {
+            @Override
+            public void beforeRefresh() {}
+
+            @Override
+            public void afterRefresh(boolean didRefresh) {
+                if (!didRefresh || !indexSettings.isInferDynamicFieldsEnabled()) return;
+                try (Engine.Searcher searcher = getEngine().acquireSearcher("lucene_field_count", Engine.SearcherScope.INTERNAL)) {
+                    FieldInfos fieldInfos = FieldInfos.getMergedFieldInfos(searcher.getIndexReader());
+                    mapperService.getLuceneFieldTracker().setFieldInfos(fieldInfos);
+                } catch (AlreadyClosedException | IllegalIndexShardStateException e) {
+                    // shard is closing, ignore
+                }
+            }
+        });
         if (indexSettings.isSegRepEnabledOrRemoteNode()) {
             internalRefreshListener.add(new ReplicationCheckpointUpdater());
         }
