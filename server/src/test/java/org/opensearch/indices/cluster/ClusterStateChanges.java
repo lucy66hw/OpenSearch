@@ -356,7 +356,9 @@ public class ClusterStateChanges {
             threadPool,
             metadataUpdateSettingsService,
             actionFilters,
-            indexNameExpressionResolver
+            indexNameExpressionResolver,
+            null,
+            null
         );
         transportClusterRerouteAction = new TransportClusterRerouteAction(
             transportService,

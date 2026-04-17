@@ -246,6 +246,7 @@ public final class IndexScopedSettings extends AbstractScopedSettings {
                 IndexSettings.ALLOW_DERIVED_FIELDS,
                 IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED,
                 IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_EXCLUDED,
+                IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE,
 
                 // Settings for star tree index
                 StarTreeIndexSettings.STAR_TREE_DEFAULT_MAX_LEAF_DOCS,

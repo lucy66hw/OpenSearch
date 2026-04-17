@@ -185,6 +185,17 @@ public final class IndexSettings {
     );
 
     /**
+     * When true, disabling inferred mapping mode automatically promotes all inferred fields
+     * to explicit keyword mappings in the cluster state, preserving their searchability.
+     */
+    public static final Setting<Boolean> INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE = Setting.boolSetting(
+        "index.mapping.infer_dynamic_fields.promote_on_disable",
+        true,
+        Property.IndexScope,
+        Property.Dynamic
+    );
+
+    /**
      * List of field names that should NOT be inferred and must have explicit mappings.
      * These are typically predefined fields with specific types (e.g., timestamps, counters).
      */

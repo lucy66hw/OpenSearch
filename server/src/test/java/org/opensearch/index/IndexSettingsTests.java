@@ -1106,6 +1106,25 @@ public class IndexSettingsTests extends OpenSearchTestCase {
         assertFalse(settings.shouldInferField("count"));
     }
 
+    public void testInferDynamicFieldsPromoteOnDisableDefault() {
+        IndexMetadata metadata = newIndexMeta("index", Settings.EMPTY);
+        assertTrue(
+            "promote_on_disable should default to true",
+            IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.get(metadata.getSettings())
+        );
+    }
+
+    public void testInferDynamicFieldsPromoteOnDisableExplicitFalse() {
+        IndexMetadata metadata = newIndexMeta(
+            "index",
+            Settings.builder()
+                .put(IndexMetadata.SETTING_VERSION_CREATED, Version.CURRENT)
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.getKey(), false)
+                .build()
+        );
+        assertFalse(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.get(metadata.getSettings()));
+    }
+
     public void testInferDynamicFieldsDynamicUpdate() {
         IndexMetadata metadata = newIndexMeta(
             "index",

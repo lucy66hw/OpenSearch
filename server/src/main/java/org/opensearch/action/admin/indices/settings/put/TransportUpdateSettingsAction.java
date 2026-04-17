@@ -35,7 +35,11 @@ package org.opensearch.action.admin.indices.settings.put;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
+import org.opensearch.action.admin.indices.mapping.get.GetInferredFieldsRequest;
+import org.opensearch.action.admin.indices.mapping.get.TransportGetInferredFieldsAction;
+import org.opensearch.action.admin.indices.mapping.put.PutMappingClusterStateUpdateRequest;
 import org.opensearch.action.support.ActionFilters;
+import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.action.support.clustermanager.TransportClusterManagerNodeAction;
 import org.opensearch.action.support.master.AcknowledgedResponse;
 import org.opensearch.cluster.ClusterState;
@@ -43,18 +47,27 @@ import org.opensearch.cluster.ack.ClusterStateUpdateResponse;
 import org.opensearch.cluster.block.ClusterBlockException;
 import org.opensearch.cluster.block.ClusterBlockLevel;
 import org.opensearch.cluster.block.ClusterBlocks;
+import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
+import org.opensearch.cluster.metadata.MetadataMappingService;
 import org.opensearch.cluster.metadata.MetadataUpdateSettingsService;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.index.Index;
+import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.index.IndexSettings;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -82,6 +95,8 @@ public class TransportUpdateSettingsAction extends TransportClusterManagerNodeAc
     private final static String[] ALLOWLIST_REMOTE_SNAPSHOT_SETTINGS_PREFIXES = { "index.search.slowlog", "index.routing.allocation" };
 
     private final MetadataUpdateSettingsService updateSettingsService;
+    private final MetadataMappingService metadataMappingService;
+    private final TransportGetInferredFieldsAction transportGetInferredFieldsAction;
 
     @Inject
     public TransportUpdateSettingsAction(
@@ -90,7 +105,9 @@ public class TransportUpdateSettingsAction extends TransportClusterManagerNodeAc
         ThreadPool threadPool,
         MetadataUpdateSettingsService updateSettingsService,
         ActionFilters actionFilters,
-        IndexNameExpressionResolver indexNameExpressionResolver
+        IndexNameExpressionResolver indexNameExpressionResolver,
+        MetadataMappingService metadataMappingService,
+        TransportGetInferredFieldsAction transportGetInferredFieldsAction
     ) {
         super(
             UpdateSettingsAction.NAME,
@@ -102,6 +119,8 @@ public class TransportUpdateSettingsAction extends TransportClusterManagerNodeAc
             indexNameExpressionResolver
         );
         this.updateSettingsService = updateSettingsService;
+        this.metadataMappingService = metadataMappingService;
+        this.transportGetInferredFieldsAction = transportGetInferredFieldsAction;
     }
 
     @Override
@@ -159,6 +178,52 @@ public class TransportUpdateSettingsAction extends TransportClusterManagerNodeAc
         final ActionListener<AcknowledgedResponse> listener
     ) {
         final Index[] concreteIndices = indexNameExpressionResolver.concreteIndices(state, request);
+        final Settings newSettings = Settings.builder()
+            .put(request.settings())
+            .normalizePrefix(IndexMetadata.INDEX_SETTING_PREFIX)
+            .build();
+
+        List<String> indicesToPromote = getIndicesRequiringPromotion(newSettings, concreteIndices, state);
+
+        if (indicesToPromote.isEmpty()) {
+            executeSettingsUpdate(request, concreteIndices, listener);
+            return;
+        }
+
+        // Step 1: Get inferred fields from Lucene (while mode is still enabled)
+        GetInferredFieldsRequest inferredRequest = new GetInferredFieldsRequest(indicesToPromote.toArray(new String[0]));
+        transportGetInferredFieldsAction.execute(inferredRequest, ActionListener.wrap(inferredResponse -> {
+            // Step 2: Promote inferred fields to explicit keyword mappings
+            promoteInferredFields(inferredResponse.getInferredFieldsByIndex(), state, ActionListener.wrap(promoteResponse -> {
+                // Step 3: Disable inferred mode (safe now — fields are already in the mapping)
+                executeSettingsUpdate(request, concreteIndices, listener);
+            }, listener::onFailure));
+        }, listener::onFailure));
+    }
+
+    List<String> getIndicesRequiringPromotion(Settings newSettings, Index[] concreteIndices, ClusterState state) {
+        if (IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.exists(newSettings) == false
+            || IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.get(newSettings)) {
+            return List.of();
+        }
+
+        List<String> indicesToPromote = new ArrayList<>();
+        for (Index index : concreteIndices) {
+            IndexMetadata indexMetadata = state.metadata().index(index);
+            if (indexMetadata == null) continue;
+            Settings indexSettings = indexMetadata.getSettings();
+            boolean currentlyEnabled = IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.get(indexSettings);
+            boolean promoteOnDisable = IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.exists(newSettings)
+                ? IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.get(newSettings)
+                : IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.get(indexSettings);
+            if (currentlyEnabled && promoteOnDisable) {
+                indicesToPromote.add(index.getName());
+            }
+        }
+        return indicesToPromote;
+    }
+
+    private void executeSettingsUpdate(UpdateSettingsRequest request, Index[] concreteIndices, ActionListener<AcknowledgedResponse> listener) {
         UpdateSettingsClusterStateUpdateRequest clusterStateUpdateRequest = new UpdateSettingsClusterStateUpdateRequest().indices(
             concreteIndices
         )
@@ -179,5 +244,54 @@ public class TransportUpdateSettingsAction extends TransportClusterManagerNodeAc
                 listener.onFailure(t);
             }
         });
+    }
+
+    private void promoteInferredFields(
+        Map<String, Set<String>> inferredByIndex,
+        ClusterState state,
+        ActionListener<Void> listener
+    ) {
+        List<Map.Entry<String, Set<String>>> toPromote = new ArrayList<>();
+        for (Map.Entry<String, Set<String>> entry : inferredByIndex.entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                toPromote.add(entry);
+            }
+        }
+
+        if (toPromote.isEmpty()) {
+            listener.onResponse(null);
+            return;
+        }
+
+        GroupedActionListener<ClusterStateUpdateResponse> groupedListener = new GroupedActionListener<>(
+            ActionListener.wrap(
+                responses -> listener.onResponse(null),
+                listener::onFailure
+            ),
+            toPromote.size()
+        );
+
+        for (Map.Entry<String, Set<String>> entry : toPromote) {
+            String indexName = entry.getKey();
+            Set<String> fields = entry.getValue();
+
+            try {
+                XContentBuilder mappingBuilder = XContentFactory.jsonBuilder().startObject().startObject("properties");
+                for (String fieldName : fields) {
+                    mappingBuilder.startObject(fieldName).field("type", "keyword").endObject();
+                }
+                mappingBuilder.endObject().endObject();
+
+                IndexMetadata indexMetadata = state.metadata().index(indexName);
+                PutMappingClusterStateUpdateRequest updateRequest = new PutMappingClusterStateUpdateRequest(
+                    mappingBuilder.toString()
+                ).indices(new Index[] { indexMetadata.getIndex() });
+
+                logger.info("Promoting {} inferred fields to explicit mappings for index [{}]", fields.size(), indexName);
+                metadataMappingService.putMapping(updateRequest, groupedListener);
+            } catch (IOException e) {
+                groupedListener.onFailure(e);
+            }
+        }
     }
 }
