@@ -2,6 +2,37 @@
 
 Service Provider Interface (SPI) for the OpenSearch gRPC transport module. This module provides interfaces and utilities that allow external plugins to extend the gRPC transport functionality.
 
+## Table of Contents
+
+- [transport-grpc-spi](#transport-grpc-spi)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Key Components](#key-components)
+    - [QueryBuilderProtoConverter](#querybuilderprotoconverter)
+    - [QueryBuilderProtoConverterRegistry](#querybuilderprotoconverterregistry)
+    - [GrpcInterceptorProvider](#grpcinterceptorprovider)
+    - [GrpcServiceFactory](#grpcservicefactory)
+  - [Usage for Plugin Developers](#usage-for-plugin-developers)
+    - [1. Add Dependency](#1-add-dependency)
+    - [2. Declare Extension in build.gradle](#2-declare-extension-in-buildgradle)
+    - [3. Create SPI Registration File(s)](#3-create-spi-registration-files)
+  - [QueryBuilderProtoConverter](#querybuilderprotoconverter-1)
+    - [1. Implement Custom Query Converter](#1-implement-custom-query-converter)
+    - [2. Register Your Converter](#2-register-your-converter)
+    - [3. Accessing the Registry (For Complex Queries)](#3-accessing-the-registry-for-complex-queries)
+  - [Testing](#testing)
+    - [Unit Tests](#unit-tests)
+    - [4. Testing Your Custom Converter](#4-testing-your-custom-converter)
+  - [Real-World Example: k-NN Plugin](#real-world-example-k-nn-plugin)
+  - [gRPC Interceptors](#grpc-interceptors)
+    - [Overview](#overview-1)
+    - [Basic Usage](#basic-usage)
+    - [Understanding Interceptor Ordering](#understanding-interceptor-ordering)
+      - [How Order Values Work](#how-order-values-work)
+      - [Duplicate Order Values](#duplicate-order-values)
+  - [GrpcServiceFactory](#grpcservicefactory-1)
+    - [1. Implement Custom Service Factory](#1-implement-custom-service-factory)
+
 ## Overview
 
 The `transport-grpc-spi` module enables plugin developers to:
@@ -9,6 +40,11 @@ The `transport-grpc-spi` module enables plugin developers to:
 - Extend gRPC protocol buffer handling
 - Register custom query types that can be processed via gRPC
 - Register gRPC interceptors with explicit ordering
+- Register `BindableService` implementation to the gRPC transport
+
+**For contributing to OpenSearch gRPC APIs, see the [Contributing to gRPC APIs](../README.md#contributing-to-grpc-apis) guide in the transport-grpc module.**
+
+---
 
 ## Key Components
 
@@ -47,6 +83,10 @@ public interface GrpcInterceptorProvider {
 }
 ```
 
+### GrpcServiceFactory
+
+Interface for providing a `BindableService` factory to be registered on the grpc transport.
+
 ## Usage for Plugin Developers
 
 ### 1. Add Dependency
@@ -63,7 +103,7 @@ dependencies {
 
 ### 2. Declare Extension in build.gradle
 
-In your `build.gradle`, declare that your plugin extends `transport-grpc`. This automatically adds the `extended.plugins=transport-grpc` entry to the auto-generated `plugin-descriptor.properties` file:  :
+In your `build.gradle`, declare that your plugin extends `transport-grpc`. This automatically adds the `extended.plugins=transport-grpc` entry to the auto-generated `plugin-descriptor.properties` file:
 
 ```groovy
 opensearchplugin {
@@ -81,20 +121,26 @@ opensearchplugin {
 
 Create a service file denoting your plugin's implementation of a service interface.
 
-For QueryBuilderProtoConverter implementations:
+For `QueryBuilderProtoConverter` implementations:
 `src/main/resources/META-INF/services/org.opensearch.transport.grpc.spi.QueryBuilderProtoConverter`:
 
 ```
 org.opensearch.mypackage.MyCustomQueryConverter
 ```
 
-For `GrpcInterceptorProvider` implementations: `src/main/resources/META-INF/services/org.opensearch.transport.grpc.spi.GrpcInterceptorProvider`:
+For `GrpcInterceptorProvider` implementations:
+`src/main/resources/META-INF/services/org.opensearch.transport.grpc.spi.GrpcInterceptorProvider`:
 
 ```
 org.opensearch.mypackage.SampleInterceptorProvider
 ```
 
+For `GrpcServiceFactory` implementations:
+`src/main/resources/META-INF/services/org.opensearch.transport.grpc.spi.GrpcServiceFactory`:
 
+```
+org.opensearch.mypackage.MyCustomGrpcServiceFactory
+```
 
 ## QueryBuilderProtoConverter
 ### 1. Implement Custom Query Converter
@@ -385,4 +431,26 @@ Each interceptor must have a unique order value. If duplicate order values are d
 ```
 IllegalArgumentException: Multiple gRPC interceptors have the same order value: 10.
 Each interceptor must have a unique order value.
+```
+
+## GrpcServiceFactory
+
+### 1. Implement Custom Service Factory
+
+Several node resources are exposed to a `GrpcServiceFactory` for use within services such as client, settings, and thread pools.
+A plugin's `GrpcServiceFactory` implementation will be discovered through the SPI registration file and registered on the gRPC transport.
+
+```java
+public static class MockServiceProvider implements GrpcServiceFactory {
+
+    @Override
+    public String plugin() {
+        return "MockExtendingPlugin";
+    }
+
+    @Override
+    public List<BindableService> build() {
+        return List.of(new MockChannelzService());
+    }
+}
 ```

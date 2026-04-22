@@ -14,14 +14,20 @@ import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.core.indices.breaker.CircuitBreakerService;
+import org.opensearch.env.Environment;
 import org.opensearch.plugins.ExtensiblePlugin;
+import org.opensearch.protobufs.AggregationContainer;
 import org.opensearch.protobufs.QueryContainer;
+import org.opensearch.search.aggregations.metrics.InternalMax;
+import org.opensearch.search.aggregations.metrics.MinAggregationBuilder;
 import org.opensearch.telemetry.tracing.Tracer;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.AuxTransport;
 import org.opensearch.transport.client.Client;
 import org.opensearch.transport.grpc.interceptor.GrpcInterceptorChain;
+import org.opensearch.transport.grpc.spi.AggregateProtoConverter;
+import org.opensearch.transport.grpc.spi.AggregationBuilderProtoConverter;
 import org.opensearch.transport.grpc.spi.GrpcInterceptorProvider;
 import org.opensearch.transport.grpc.spi.GrpcInterceptorProvider.OrderedGrpcInterceptor;
 import org.opensearch.transport.grpc.spi.QueryBuilderProtoConverter;
@@ -79,6 +85,9 @@ public class GrpcPluginTests extends OpenSearchTestCase {
     @Mock
     private Client client;
 
+    @Mock
+    private Environment environment;
+
     private NetworkService networkService;
 
     private ClusterSettings clusterSettings;
@@ -98,8 +107,9 @@ public class GrpcPluginTests extends OpenSearchTestCase {
         // Create a real ClusterSettings instance with the plugin's settings
         plugin = new GrpcPlugin();
 
-        // Mock ThreadPool and ThreadContext
+        // Mock ThreadPool/ThreadContext/Environment
         when(threadPool.getThreadContext()).thenReturn(new ThreadContext(Settings.EMPTY));
+        when(environment.settings()).thenReturn(Settings.EMPTY);
 
         // Set the client in the plugin
         plugin.createComponents(
@@ -109,7 +119,7 @@ public class GrpcPluginTests extends OpenSearchTestCase {
             null, // ResourceWatcherService
             null, // ScriptService
             null, // NamedXContentRegistry
-            null, // Environment
+            environment, // Environment
             null, // NodeEnvironment
             null, // NamedWriteableRegistry
             null, // IndexNameExpressionResolver
@@ -365,6 +375,118 @@ public class GrpcPluginTests extends OpenSearchTestCase {
         Mockito.verify(mockConverter, Mockito.times(2)).setRegistry(Mockito.any());
     }
 
+    public void testCreateComponentsWithExternalAggregationConverters() {
+        GrpcPlugin newPlugin = new GrpcPlugin();
+
+        AggregationBuilderProtoConverter mockConverter = Mockito.mock(AggregationBuilderProtoConverter.class);
+        when(mockConverter.getHandledAggregationCase()).thenReturn(AggregationContainer.AggregationContainerCase.MIN);
+        when(mockConverter.fromProto(Mockito.anyString(), Mockito.any())).thenReturn(new MinAggregationBuilder("external_min"));
+
+        ExtensiblePlugin.ExtensionLoader mockLoader = Mockito.mock(ExtensiblePlugin.ExtensionLoader.class);
+        when(mockLoader.loadExtensions(AggregationBuilderProtoConverter.class)).thenReturn(List.of(mockConverter));
+
+        newPlugin.loadExtensions(mockLoader);
+
+        ThreadPool mockThreadPool = Mockito.mock(ThreadPool.class);
+        when(mockThreadPool.getThreadContext()).thenReturn(new ThreadContext(Settings.EMPTY));
+
+        newPlugin.createComponents(client, null, mockThreadPool, null, null, null, null, null, null, null, null);
+
+        assertNotNull("QueryUtils should be initialized", newPlugin.getQueryUtils());
+
+        // getHandledAggregationCase() called in: loadExtensions logging, createComponents logging, SPI registerConverter
+        Mockito.verify(mockConverter, Mockito.times(3)).getHandledAggregationCase();
+
+        // setRegistry called in: createComponents manual injection, registerConverter, updateRegistryOnAllConverters
+        Mockito.verify(mockConverter, Mockito.times(3)).setRegistry(Mockito.any());
+    }
+
+    public void testCreateComponentsWithExternalAggregateConverters() {
+        GrpcPlugin newPlugin = new GrpcPlugin();
+
+        AggregateProtoConverter mockConverter = Mockito.mock(AggregateProtoConverter.class);
+        Mockito.doReturn(InternalMax.class).when(mockConverter).getHandledAggregationType();
+
+        ExtensiblePlugin.ExtensionLoader mockLoader = Mockito.mock(ExtensiblePlugin.ExtensionLoader.class);
+        when(mockLoader.loadExtensions(AggregateProtoConverter.class)).thenReturn(List.of(mockConverter));
+
+        newPlugin.loadExtensions(mockLoader);
+
+        ThreadPool mockThreadPool = Mockito.mock(ThreadPool.class);
+        when(mockThreadPool.getThreadContext()).thenReturn(new ThreadContext(Settings.EMPTY));
+
+        newPlugin.createComponents(client, null, mockThreadPool, null, null, null, null, null, null, null, null);
+
+        assertNotNull("QueryUtils should be initialized", newPlugin.getQueryUtils());
+
+        // getHandledAggregationType() called in: loadExtensions logging, createComponents logging
+        Mockito.verify(mockConverter, Mockito.atLeast(2)).getHandledAggregationType();
+
+        // setRegistry called in: registerConverter, updateRegistryOnAllConverters
+        Mockito.verify(mockConverter, Mockito.times(2)).setRegistry(Mockito.any());
+    }
+
+    public void testLoadExtensionsWithAggregationConverters() {
+        GrpcPlugin newPlugin = new GrpcPlugin();
+
+        AggregationBuilderProtoConverter mockAggConverter = Mockito.mock(AggregationBuilderProtoConverter.class);
+        when(mockAggConverter.getHandledAggregationCase()).thenReturn(AggregationContainer.AggregationContainerCase.MIN);
+
+        AggregateProtoConverter mockAggregateConverter = Mockito.mock(AggregateProtoConverter.class);
+        Mockito.doReturn(InternalMax.class).when(mockAggregateConverter).getHandledAggregationType();
+
+        ExtensiblePlugin.ExtensionLoader mockLoader = Mockito.mock(ExtensiblePlugin.ExtensionLoader.class);
+        when(mockLoader.loadExtensions(AggregationBuilderProtoConverter.class)).thenReturn(List.of(mockAggConverter));
+        when(mockLoader.loadExtensions(AggregateProtoConverter.class)).thenReturn(List.of(mockAggregateConverter));
+
+        newPlugin.loadExtensions(mockLoader);
+
+        // Verify converters were discovered during loadExtensions
+        Mockito.verify(mockAggConverter).getHandledAggregationCase();
+        Mockito.verify(mockAggregateConverter).getHandledAggregationType();
+    }
+
+    public void testCreateComponentsWithBothExternalConverters() {
+        GrpcPlugin newPlugin = new GrpcPlugin();
+
+        AggregationBuilderProtoConverter mockAggConverter = Mockito.mock(AggregationBuilderProtoConverter.class);
+        when(mockAggConverter.getHandledAggregationCase()).thenReturn(AggregationContainer.AggregationContainerCase.MIN);
+        when(mockAggConverter.fromProto(Mockito.anyString(), Mockito.any())).thenReturn(new MinAggregationBuilder("ext_min"));
+
+        AggregateProtoConverter mockAggregateConverter = Mockito.mock(AggregateProtoConverter.class);
+        Mockito.doReturn(InternalMax.class).when(mockAggregateConverter).getHandledAggregationType();
+
+        ExtensiblePlugin.ExtensionLoader mockLoader = Mockito.mock(ExtensiblePlugin.ExtensionLoader.class);
+        when(mockLoader.loadExtensions(AggregationBuilderProtoConverter.class)).thenReturn(List.of(mockAggConverter));
+        when(mockLoader.loadExtensions(AggregateProtoConverter.class)).thenReturn(List.of(mockAggregateConverter));
+
+        newPlugin.loadExtensions(mockLoader);
+
+        ThreadPool mockThreadPool = Mockito.mock(ThreadPool.class);
+        when(mockThreadPool.getThreadContext()).thenReturn(new ThreadContext(Settings.EMPTY));
+
+        newPlugin.createComponents(client, null, mockThreadPool, null, null, null, null, null, null, null, null);
+
+        assertNotNull("QueryUtils should be initialized", newPlugin.getQueryUtils());
+
+        // Request-side: setRegistry (manual + registerConverter + updateRegistryOnAllConverters)
+        Mockito.verify(mockAggConverter, Mockito.times(3)).setRegistry(Mockito.any());
+        // Response-side: setRegistry (registerConverter + updateRegistryOnAllConverters)
+        Mockito.verify(mockAggregateConverter, Mockito.times(2)).setRegistry(Mockito.any());
+    }
+
+    public void testLoadExtensionsWithNullAggregationConverters() {
+        GrpcPlugin newPlugin = new GrpcPlugin();
+
+        ExtensiblePlugin.ExtensionLoader mockLoader = Mockito.mock(ExtensiblePlugin.ExtensionLoader.class);
+        when(mockLoader.loadExtensions(AggregationBuilderProtoConverter.class)).thenReturn(null);
+        when(mockLoader.loadExtensions(AggregateProtoConverter.class)).thenReturn(null);
+
+        newPlugin.loadExtensions(mockLoader);
+
+        // Should not throw — null extensions are handled gracefully
+    }
+
     // Test cases for gRPC interceptor functionality
 
     public void testLoadExtensionsWithGrpcInterceptors() {
@@ -386,12 +508,11 @@ public class GrpcPluginTests extends OpenSearchTestCase {
 
         IllegalArgumentException exception = expectThrows(
             IllegalArgumentException.class,
-            () -> plugin.createComponents(client, null, mockThreadPool, null, null, null, null, null, null, null, null)
+            () -> plugin.createComponents(client, null, mockThreadPool, null, null, null, environment, null, null, null, null)
         );
 
         String errorMessage = exception.getMessage();
         assertTrue(errorMessage.contains("Multiple gRPC interceptors have the same order value [1]"));
-        assertTrue(errorMessage.contains("ServerInterceptor")); // Mock class name will contain this
         assertTrue(errorMessage.contains("Each interceptor must have a unique order value"));
     }
 
@@ -408,12 +529,11 @@ public class GrpcPluginTests extends OpenSearchTestCase {
 
         IllegalArgumentException exception = expectThrows(
             IllegalArgumentException.class,
-            () -> plugin.createComponents(client, null, mockThreadPool, null, null, null, null, null, null, null, null)
+            () -> plugin.createComponents(client, null, mockThreadPool, null, null, null, environment, null, null, null, null)
         );
 
         String errorMessage = exception.getMessage();
         assertTrue(errorMessage.contains("Multiple gRPC interceptors have the same order value [5]"));
-        assertTrue(errorMessage.contains("ServerInterceptor"));
         assertTrue(errorMessage.contains("Each interceptor must have a unique order value"));
     }
 
@@ -436,12 +556,11 @@ public class GrpcPluginTests extends OpenSearchTestCase {
 
         IllegalArgumentException exception = expectThrows(
             IllegalArgumentException.class,
-            () -> plugin.createComponents(client, null, mockThreadPool, null, null, null, null, null, null, null, null)
+            () -> plugin.createComponents(client, null, mockThreadPool, null, null, null, environment, null, null, null, null)
         );
 
         String errorMessage = exception.getMessage();
         assertTrue(errorMessage.contains("Multiple gRPC interceptors have the same order value [5]"));
-        assertTrue(errorMessage.contains("ServerInterceptor"));
         assertTrue(errorMessage.contains("Each interceptor must have a unique order value"));
     }
 
@@ -680,13 +799,31 @@ public class GrpcPluginTests extends OpenSearchTestCase {
     }
 
     /**
-     * Creates a mock interceptor with given order
+     * Creates a no-op interceptor with the specified order.
      */
     private OrderedGrpcInterceptor createMockInterceptor(int order) {
-        OrderedGrpcInterceptor mock = Mockito.mock(OrderedGrpcInterceptor.class);
-        when(mock.order()).thenReturn(order);
-        when(mock.getInterceptor()).thenReturn(Mockito.mock(ServerInterceptor.class));
-        return mock;
+        return new OrderedGrpcInterceptor() {
+
+            @Override
+            public int order() {
+                return order;
+            }
+
+            @Override
+            public ServerInterceptor getInterceptor() {
+                return new ServerInterceptor() {
+                    @Override
+                    public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
+                        ServerCall<ReqT, RespT> call,
+                        Metadata headers,
+                        ServerCallHandler<ReqT, RespT> next
+                    ) {
+                        // no-op interceptor
+                        return next.startCall(call, headers);
+                    }
+                };
+            }
+        };
     }
 
     private void assertDoesNotThrow(Runnable runnable) {
@@ -839,7 +976,9 @@ public class GrpcPluginTests extends OpenSearchTestCase {
         ThreadPool mockThreadPool = Mockito.mock(ThreadPool.class);
         when(mockThreadPool.getThreadContext()).thenReturn(new org.opensearch.common.util.concurrent.ThreadContext(Settings.EMPTY));
 
-        assertDoesNotThrow(() -> plugin.createComponents(client, null, mockThreadPool, null, null, null, null, null, null, null, null));
+        assertDoesNotThrow(
+            () -> plugin.createComponents(client, null, mockThreadPool, null, null, null, environment, null, null, null, null)
+        );
     }
 
     public void testGrpcInterceptorChainWithDuplicateOrders() {
@@ -867,7 +1006,7 @@ public class GrpcPluginTests extends OpenSearchTestCase {
         // Should throw exception due to duplicate orders during createComponents
         IllegalArgumentException exception = expectThrows(
             IllegalArgumentException.class,
-            () -> plugin.createComponents(client, null, mockThreadPool, null, null, null, null, null, null, null, null)
+            () -> plugin.createComponents(client, null, mockThreadPool, null, null, null, environment, null, null, null, null)
         );
 
         // Verify error message includes order value and interceptor class names
@@ -920,6 +1059,55 @@ public class GrpcPluginTests extends OpenSearchTestCase {
                 );
             }
         }
+    }
+
+    public void testGrpcInterceptorProviderSettingsInitialization() {
+        // Mock extension loading for GrpcPlugin
+        TestSettingsAwareInterceptorProvider provider = new TestSettingsAwareInterceptorProvider();
+        ExtensiblePlugin.ExtensionLoader mockLoader = Mockito.mock(ExtensiblePlugin.ExtensionLoader.class);
+        when(mockLoader.loadExtensions(QueryBuilderProtoConverter.class)).thenReturn(null);
+        when(mockLoader.loadExtensions(GrpcInterceptorProvider.class)).thenReturn(List.of(provider));
+        GrpcPlugin plugin = new GrpcPlugin();
+        plugin.loadExtensions(mockLoader);
+
+        // Mock Environments
+        Settings validSetting = Settings.builder().put("test-setting", true).build();
+        Environment validEnv = Mockito.mock(Environment.class);
+        when(validEnv.settings()).thenReturn(validSetting);
+
+        Settings invalidSetting = Settings.builder().put("test-setting", false).build();
+        Environment invalidEnv = Mockito.mock(Environment.class);
+        when(invalidEnv.settings()).thenReturn(invalidSetting);
+
+        Settings emptySetting = Settings.builder().build();
+        Environment emptyEnv = Mockito.mock(Environment.class);
+        when(emptyEnv.settings()).thenReturn(emptySetting);
+
+        // createComponents initializes interceptor with the correct setting
+        assertDoesNotThrow(() -> plugin.createComponents(client, null, threadPool, null, null, null, validEnv, null, null, null, null));
+
+        // createComponents throws exception with the incorrect setting
+        try {
+            plugin.createComponents(client, null, threadPool, null, null, null, invalidEnv, null, null, null, null);
+            fail("Expect test interceptor with wrong settings throws exception.");
+        } catch (RuntimeException e) {
+            assertEquals("test-setting not found or not set to true", e.getMessage());
+        }
+
+        // createComponents throws exception with empty setting
+        try {
+            plugin.createComponents(client, null, threadPool, null, null, null, emptyEnv, null, null, null, null);
+            fail("Expect test interceptor with empty settings throws exception.");
+        } catch (RuntimeException e) {
+            assertEquals("test-setting not found or not set to true", e.getMessage());
+        }
+    }
+
+    public void testGrpcInterceptorProviderEmpty() {
+        GrpcInterceptorProvider prov = threadContext -> List.of();
+        assertDoesNotThrow(() -> prov.initNodeSettings(Settings.EMPTY));
+        List<OrderedGrpcInterceptor> interceptors = prov.getOrderedGrpcInterceptors(new ThreadContext(Settings.EMPTY));
+        assertTrue(interceptors.isEmpty());
     }
 
     /**
@@ -978,4 +1166,45 @@ public class GrpcPluginTests extends OpenSearchTestCase {
         };
     }
 
+    /**
+     * Test interceptor provider that validates GrpcInterceptorProvider's access to settings.
+     * TestSettingsAwareInterceptorProvider will throw an exception if setting "test-setting" is not true.
+     */
+    private static class TestSettingsAwareInterceptorProvider implements GrpcInterceptorProvider {
+        private Settings settings;
+
+        @Override
+        public void initNodeSettings(Settings settings) {
+            this.settings = settings;
+        }
+
+        @Override
+        public List<OrderedGrpcInterceptor> getOrderedGrpcInterceptors(ThreadContext threadContext) {
+            if (settings == null || !settings.getAsBoolean("test-setting", false)) {
+                throw new RuntimeException("test-setting not found or not set to true");
+            }
+
+            return List.of(new OrderedGrpcInterceptor() {
+                @Override
+                public int order() {
+                    return 100;
+                }
+
+                @Override
+                public ServerInterceptor getInterceptor() {
+                    return new ServerInterceptor() {
+                        @Override
+                        public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
+                            ServerCall<ReqT, RespT> call,
+                            Metadata headers,
+                            ServerCallHandler<ReqT, RespT> next
+                        ) {
+                            // No-op interceptor - just pass through
+                            return next.startCall(call, headers);
+                        }
+                    };
+                }
+            });
+        }
+    }
 }
