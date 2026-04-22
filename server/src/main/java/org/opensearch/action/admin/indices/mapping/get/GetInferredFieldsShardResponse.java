@@ -49,8 +49,7 @@ public class GetInferredFieldsShardResponse extends BroadcastShardResponse {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         GetInferredFieldsShardResponse that = (GetInferredFieldsShardResponse) o;
-        return Objects.equals(getShardId(), that.getShardId())
-            && Objects.equals(inferredFieldNames, that.inferredFieldNames);
+        return Objects.equals(getShardId(), that.getShardId()) && Objects.equals(inferredFieldNames, that.inferredFieldNames);
     }
 
     @Override

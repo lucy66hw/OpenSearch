@@ -8,8 +8,8 @@
 
 package org.opensearch.action.admin.indices.maxfieldcount;
 
-import org.opensearch.core.index.shard.ShardId;
 import org.opensearch.core.common.io.stream.Writeable;
+import org.opensearch.core.index.shard.ShardId;
 import org.opensearch.test.AbstractWireSerializingTestCase;
 
 import java.io.IOException;

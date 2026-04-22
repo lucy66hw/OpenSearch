@@ -66,8 +66,12 @@ public class TransportGetMaxFieldCountActionTests extends OpenSearchTestCase {
         AtomicReferenceArray<Object> shardsResponses = new AtomicReferenceArray<>(3);
         shardsResponses.set(0, null);
         shardsResponses.set(1, new GetMaxFieldCountShardResponse(new ShardId("idx", "_na_", 1), 5));
-        shardsResponses.set(2, new org.opensearch.action.support.broadcast.BroadcastShardOperationFailedException(
-            new ShardId("idx", "_na_", 2), "simulated failure")
+        shardsResponses.set(
+            2,
+            new org.opensearch.action.support.broadcast.BroadcastShardOperationFailedException(
+                new ShardId("idx", "_na_", 2),
+                "simulated failure"
+            )
         );
 
         GetMaxFieldCountResponse response = action.newResponse(request, shardsResponses, ClusterState.EMPTY_STATE);
@@ -83,7 +87,9 @@ public class TransportGetMaxFieldCountActionTests extends OpenSearchTestCase {
             mock(TransportService.class),
             mock(ClusterService.class),
             new ActionFilters(Collections.emptySet()),
-            new IndexNameExpressionResolver(new org.opensearch.common.util.concurrent.ThreadContext(org.opensearch.common.settings.Settings.EMPTY)),
+            new IndexNameExpressionResolver(
+                new org.opensearch.common.util.concurrent.ThreadContext(org.opensearch.common.settings.Settings.EMPTY)
+            ),
             mock(IndicesService.class)
         );
     }

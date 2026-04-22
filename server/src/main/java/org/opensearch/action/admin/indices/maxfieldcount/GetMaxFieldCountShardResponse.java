@@ -44,8 +44,7 @@ public class GetMaxFieldCountShardResponse extends BroadcastShardResponse {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         GetMaxFieldCountShardResponse that = (GetMaxFieldCountShardResponse) o;
-        return fieldCount == that.fieldCount
-            && Objects.equals(getShardId(), that.getShardId());
+        return fieldCount == that.fieldCount && Objects.equals(getShardId(), that.getShardId());
     }
 
     @Override

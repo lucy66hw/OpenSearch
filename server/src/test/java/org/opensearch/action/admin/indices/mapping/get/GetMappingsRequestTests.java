@@ -48,7 +48,14 @@ public class GetMappingsRequestTests extends AbstractWireSerializingTestCase<Get
         List<Consumer<GetMappingsRequest>> mutators = new ArrayList<>();
         mutators.add(req -> req.indices(generateRandomStringArray(3, 8, false, false)));
         mutators.add(req -> req.includeInferred(!req.includeInferred()));
-        mutators.add(req -> req.indicesOptions(randomValueOtherThan(req.indicesOptions(), () -> randomFrom(IndicesOptions.strictExpandOpen(), IndicesOptions.lenientExpandOpen()))));
+        mutators.add(
+            req -> req.indicesOptions(
+                randomValueOtherThan(
+                    req.indicesOptions(),
+                    () -> randomFrom(IndicesOptions.strictExpandOpen(), IndicesOptions.lenientExpandOpen())
+                )
+            )
+        );
         GetMappingsRequest mutated = copyInstance(instance);
         randomFrom(mutators).accept(mutated);
         return mutated;

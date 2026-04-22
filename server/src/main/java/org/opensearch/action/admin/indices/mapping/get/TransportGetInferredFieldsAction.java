@@ -11,6 +11,7 @@ package org.opensearch.action.admin.indices.mapping.get;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.IndexReader;
+import org.opensearch.Version;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.broadcast.BroadcastShardOperationFailedException;
 import org.opensearch.action.support.broadcast.TransportBroadcastAction;
@@ -34,7 +35,6 @@ import org.opensearch.indices.IndicesService;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
-import org.opensearch.Version;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -96,20 +96,12 @@ public class TransportGetInferredFieldsAction extends TransportBroadcastAction<
     }
 
     @Override
-    protected ClusterBlockException checkRequestBlock(
-        ClusterState state,
-        GetInferredFieldsRequest request,
-        String[] concreteIndices
-    ) {
+    protected ClusterBlockException checkRequestBlock(ClusterState state, GetInferredFieldsRequest request, String[] concreteIndices) {
         return state.blocks().indicesBlockedException(ClusterBlockLevel.READ, concreteIndices);
     }
 
     @Override
-    protected GetInferredFieldsShardRequest newShardRequest(
-        int numShards,
-        ShardRouting shard,
-        GetInferredFieldsRequest request
-    ) {
+    protected GetInferredFieldsShardRequest newShardRequest(int numShards, ShardRouting shard, GetInferredFieldsRequest request) {
         return new GetInferredFieldsShardRequest(shard.shardId(), request);
     }
 
@@ -181,12 +173,6 @@ public class TransportGetInferredFieldsAction extends TransportBroadcastAction<
             byIndex.put(e.getKey(), Collections.unmodifiableSet(e.getValue()));
         }
 
-        return new GetInferredFieldsResponse(
-            totalShards,
-            successfulShards,
-            failedShards,
-            failures,
-            Collections.unmodifiableMap(byIndex)
-        );
+        return new GetInferredFieldsResponse(totalShards, successfulShards, failedShards, failures, Collections.unmodifiableMap(byIndex));
     }
 }

@@ -10,7 +10,6 @@ package org.opensearch.rest.action.admin.indices;
 
 import org.opensearch.action.admin.indices.maxfieldcount.GetMaxFieldCountAction;
 import org.opensearch.action.admin.indices.maxfieldcount.GetMaxFieldCountRequest;
-import org.opensearch.action.admin.indices.maxfieldcount.GetMaxFieldCountResponse;
 import org.opensearch.action.support.IndicesOptions;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.core.common.Strings;
@@ -35,12 +34,7 @@ public class RestGetMaxFieldCountAction extends BaseRestHandler {
 
     @Override
     public List<Route> routes() {
-        return unmodifiableList(
-            asList(
-                new Route(GET, "/_max_field_count"),
-                new Route(GET, "/{index}/_max_field_count")
-            )
-        );
+        return unmodifiableList(asList(new Route(GET, "/_max_field_count"), new Route(GET, "/{index}/_max_field_count")));
     }
 
     @Override
@@ -54,10 +48,6 @@ public class RestGetMaxFieldCountAction extends BaseRestHandler {
         GetMaxFieldCountRequest getMaxFieldCountRequest = new GetMaxFieldCountRequest(indices);
         getMaxFieldCountRequest.indicesOptions(IndicesOptions.fromRequest(request, getMaxFieldCountRequest.indicesOptions()));
 
-        return channel -> client.execute(
-            GetMaxFieldCountAction.INSTANCE,
-            getMaxFieldCountRequest,
-            new RestToXContentListener<>(channel)
-        );
+        return channel -> client.execute(GetMaxFieldCountAction.INSTANCE, getMaxFieldCountRequest, new RestToXContentListener<>(channel));
     }
 }

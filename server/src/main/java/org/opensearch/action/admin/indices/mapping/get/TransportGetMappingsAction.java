@@ -113,18 +113,11 @@ public class TransportGetMappingsAction extends TransportClusterInfoAction<GetMa
                 return;
             }
             GetInferredFieldsRequest inferredRequest = new GetInferredFieldsRequest(concreteIndices);
-            transportGetInferredFieldsAction.execute(
-                task,
-                inferredRequest,
-                ActionListener.wrap(
-                    inferredResponse -> {
-                        Map<String, Set<String>> inferredByIndex = inferredResponse.getInferredFieldsByIndex();
-                        Map<String, MappingMetadata> merged = mergeInferredIntoMappings(result, inferredByIndex);
-                        listener.onResponse(new GetMappingsResponse(merged));
-                    },
-                    listener::onFailure
-                )
-            );
+            transportGetInferredFieldsAction.execute(task, inferredRequest, ActionListener.wrap(inferredResponse -> {
+                Map<String, Set<String>> inferredByIndex = inferredResponse.getInferredFieldsByIndex();
+                Map<String, MappingMetadata> merged = mergeInferredIntoMappings(result, inferredByIndex);
+                listener.onResponse(new GetMappingsResponse(merged));
+            }, listener::onFailure));
         } catch (IOException e) {
             listener.onFailure(e);
         }

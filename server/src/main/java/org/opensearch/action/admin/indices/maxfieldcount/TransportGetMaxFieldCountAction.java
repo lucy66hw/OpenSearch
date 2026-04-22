@@ -91,20 +91,12 @@ public class TransportGetMaxFieldCountAction extends TransportBroadcastAction<
     }
 
     @Override
-    protected ClusterBlockException checkRequestBlock(
-        ClusterState state,
-        GetMaxFieldCountRequest request,
-        String[] concreteIndices
-    ) {
+    protected ClusterBlockException checkRequestBlock(ClusterState state, GetMaxFieldCountRequest request, String[] concreteIndices) {
         return state.blocks().indicesBlockedException(ClusterBlockLevel.READ, concreteIndices);
     }
 
     @Override
-    protected GetMaxFieldCountShardRequest newShardRequest(
-        int numShards,
-        ShardRouting shard,
-        GetMaxFieldCountRequest request
-    ) {
+    protected GetMaxFieldCountShardRequest newShardRequest(int numShards, ShardRouting shard, GetMaxFieldCountRequest request) {
         return new GetMaxFieldCountShardRequest(shard.shardId(), request);
     }
 

@@ -231,7 +231,11 @@ public class GetMappingsActionTests extends OpenSearchTestCase {
     public void testIncludeInferredFalseCompletesWithoutCallingGetInferredFields() {
         GetMappingsRequest request = new GetMappingsRequest();
         request.includeInferred(false);
-        transportAction.execute(null, request, ActionListener.wrap(Assert::assertNotNull, exception -> { throw new AssertionError(exception); }));
+        transportAction.execute(
+            null,
+            request,
+            ActionListener.wrap(Assert::assertNotNull, exception -> { throw new AssertionError(exception); })
+        );
         assertThat(capturingTransport.capturedRequests().length, equalTo(1));
         CapturingTransport.CapturedRequest capturedRequest = capturingTransport.capturedRequests()[0];
         GetTermVersionResponse termResp = new GetTermVersionResponse(

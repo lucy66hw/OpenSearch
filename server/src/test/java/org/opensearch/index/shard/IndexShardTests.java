@@ -4956,9 +4956,7 @@ public class IndexShardTests extends IndexShardTestCase {
     }
 
     public void testLuceneFieldTrackerUpdatedOnRefreshWhenInferredModeEnabled() throws IOException {
-        Settings settings = Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
-            .build();
+        Settings settings = Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true).build();
         IndexShard shard = newStartedShard(true, settings);
 
         assertEquals(0, shard.mapperService().getLuceneFieldTracker().getFieldInfos().size());
@@ -4973,9 +4971,7 @@ public class IndexShardTests extends IndexShardTestCase {
     }
 
     public void testLuceneFieldTrackerNotUpdatedWhenInferredModeDisabled() throws IOException {
-        Settings settings = Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false)
-            .build();
+        Settings settings = Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false).build();
         IndexShard shard = newStartedShard(true, settings);
 
         indexDoc(shard, "_doc", "1", "{\"field1\": \"value1\", \"field2\": \"value2\"}");
@@ -4987,9 +4983,7 @@ public class IndexShardTests extends IndexShardTestCase {
     }
 
     public void testLuceneFieldTrackerCountIncreasesWithNewFields() throws IOException {
-        Settings settings = Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
-            .build();
+        Settings settings = Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true).build();
         IndexShard shard = newStartedShard(true, settings);
 
         indexDoc(shard, "_doc", "1", "{\"fieldA\": \"val\"}");

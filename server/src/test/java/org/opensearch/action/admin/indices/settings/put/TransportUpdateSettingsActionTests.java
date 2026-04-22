@@ -27,7 +27,6 @@ import org.opensearch.transport.TransportService;
 import org.junit.After;
 import org.junit.Before;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -78,87 +77,87 @@ public class TransportUpdateSettingsActionTests extends OpenSearchTestCase {
         for (IndexMetadata im : indices) {
             metadataBuilder.put(im, false);
         }
-        return ClusterState.builder(
-            org.opensearch.cluster.ClusterName.CLUSTER_NAME_SETTING.getDefault(Settings.EMPTY)
-        ).metadata(metadataBuilder).build();
+        return ClusterState.builder(org.opensearch.cluster.ClusterName.CLUSTER_NAME_SETTING.getDefault(Settings.EMPTY))
+            .metadata(metadataBuilder)
+            .build();
     }
 
     public void testNoPromotionWhenNotDisablingInferredMode() {
-        IndexMetadata index = buildIndexMetadata("test-index", Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
-            .build());
+        IndexMetadata index = buildIndexMetadata(
+            "test-index",
+            Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true).build()
+        );
         ClusterState state = clusterStateWith(index);
 
-        Settings newSettings = Settings.builder()
-            .put("index.number_of_replicas", 2)
-            .build();
+        Settings newSettings = Settings.builder().put("index.number_of_replicas", 2).build();
 
         List<String> result = action.getIndicesRequiringPromotion(newSettings, new Index[] { index.getIndex() }, state);
         assertTrue("Should not promote when not disabling inferred mode", result.isEmpty());
     }
 
     public void testNoPromotionWhenEnablingInferredMode() {
-        IndexMetadata index = buildIndexMetadata("test-index", Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false)
-            .build());
+        IndexMetadata index = buildIndexMetadata(
+            "test-index",
+            Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false).build()
+        );
         ClusterState state = clusterStateWith(index);
 
-        Settings newSettings = Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
-            .build();
+        Settings newSettings = Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true).build();
 
         List<String> result = action.getIndicesRequiringPromotion(newSettings, new Index[] { index.getIndex() }, state);
         assertTrue("Should not promote when enabling inferred mode", result.isEmpty());
     }
 
     public void testNoPromotionWhenIndexNotCurrentlyEnabled() {
-        IndexMetadata index = buildIndexMetadata("test-index", Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false)
-            .build());
+        IndexMetadata index = buildIndexMetadata(
+            "test-index",
+            Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false).build()
+        );
         ClusterState state = clusterStateWith(index);
 
-        Settings newSettings = Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false)
-            .build();
+        Settings newSettings = Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false).build();
 
         List<String> result = action.getIndicesRequiringPromotion(newSettings, new Index[] { index.getIndex() }, state);
         assertTrue("Should not promote when index was not using inferred mode", result.isEmpty());
     }
 
     public void testPromotionWhenDisablingWithDefaultPromoteOnDisable() {
-        IndexMetadata index = buildIndexMetadata("test-index", Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
-            .build());
+        IndexMetadata index = buildIndexMetadata(
+            "test-index",
+            Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true).build()
+        );
         ClusterState state = clusterStateWith(index);
 
-        Settings newSettings = Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false)
-            .build();
+        Settings newSettings = Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false).build();
 
         List<String> result = action.getIndicesRequiringPromotion(newSettings, new Index[] { index.getIndex() }, state);
         assertEquals("Should promote since promote_on_disable defaults to true", List.of("test-index"), result);
     }
 
     public void testNoPromotionWhenPromoteOnDisableIsFalseOnIndex() {
-        IndexMetadata index = buildIndexMetadata("test-index", Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.getKey(), false)
-            .build());
+        IndexMetadata index = buildIndexMetadata(
+            "test-index",
+            Settings.builder()
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.getKey(), false)
+                .build()
+        );
         ClusterState state = clusterStateWith(index);
 
-        Settings newSettings = Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false)
-            .build();
+        Settings newSettings = Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false).build();
 
         List<String> result = action.getIndicesRequiringPromotion(newSettings, new Index[] { index.getIndex() }, state);
         assertTrue("Should not promote when index has promote_on_disable=false", result.isEmpty());
     }
 
     public void testPromoteOnDisableOverrideInRequest() {
-        IndexMetadata index = buildIndexMetadata("test-index", Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.getKey(), true)
-            .build());
+        IndexMetadata index = buildIndexMetadata(
+            "test-index",
+            Settings.builder()
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.getKey(), true)
+                .build()
+        );
         ClusterState state = clusterStateWith(index);
 
         Settings newSettings = Settings.builder()
@@ -171,10 +170,13 @@ public class TransportUpdateSettingsActionTests extends OpenSearchTestCase {
     }
 
     public void testPromoteOnDisableOverrideInRequestTrue() {
-        IndexMetadata index = buildIndexMetadata("test-index", Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.getKey(), false)
-            .build());
+        IndexMetadata index = buildIndexMetadata(
+            "test-index",
+            Settings.builder()
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.getKey(), false)
+                .build()
+        );
         ClusterState state = clusterStateWith(index);
 
         Settings newSettings = Settings.builder()
@@ -187,27 +189,26 @@ public class TransportUpdateSettingsActionTests extends OpenSearchTestCase {
     }
 
     public void testMultipleIndicesMixedPromotionDecisions() {
-        IndexMetadata enabledIndex = buildIndexMetadata("enabled-index", Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
-            .build());
-        IndexMetadata disabledIndex = buildIndexMetadata("disabled-index", Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false)
-            .build());
-        IndexMetadata noPromoteIndex = buildIndexMetadata("no-promote-index", Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.getKey(), false)
-            .build());
+        IndexMetadata enabledIndex = buildIndexMetadata(
+            "enabled-index",
+            Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true).build()
+        );
+        IndexMetadata disabledIndex = buildIndexMetadata(
+            "disabled-index",
+            Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false).build()
+        );
+        IndexMetadata noPromoteIndex = buildIndexMetadata(
+            "no-promote-index",
+            Settings.builder()
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), true)
+                .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_PROMOTE_ON_DISABLE.getKey(), false)
+                .build()
+        );
         ClusterState state = clusterStateWith(enabledIndex, disabledIndex, noPromoteIndex);
 
-        Settings newSettings = Settings.builder()
-            .put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false)
-            .build();
+        Settings newSettings = Settings.builder().put(IndexSettings.INDEX_INFER_DYNAMIC_FIELDS_ENABLED.getKey(), false).build();
 
-        Index[] allIndices = new Index[] {
-            enabledIndex.getIndex(),
-            disabledIndex.getIndex(),
-            noPromoteIndex.getIndex()
-        };
+        Index[] allIndices = new Index[] { enabledIndex.getIndex(), disabledIndex.getIndex(), noPromoteIndex.getIndex() };
 
         List<String> result = action.getIndicesRequiringPromotion(newSettings, allIndices, state);
         assertEquals("Only the index that was enabled with promote=true should be promoted", 1, result.size());

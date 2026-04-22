@@ -35,8 +35,7 @@ public class GetInferredFieldsRequest extends BroadcastRequest<GetInferredFields
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         GetInferredFieldsRequest that = (GetInferredFieldsRequest) o;
-        return Arrays.equals(indices(), that.indices())
-            && Objects.equals(indicesOptions(), that.indicesOptions());
+        return Arrays.equals(indices(), that.indices()) && Objects.equals(indicesOptions(), that.indicesOptions());
     }
 
     @Override

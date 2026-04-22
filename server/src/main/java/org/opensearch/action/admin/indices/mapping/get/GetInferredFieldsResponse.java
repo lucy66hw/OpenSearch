@@ -14,13 +14,13 @@ import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.Arrays;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Response containing merged inferred field names per index from all shards.

@@ -178,10 +178,7 @@ public class TransportUpdateSettingsAction extends TransportClusterManagerNodeAc
         final ActionListener<AcknowledgedResponse> listener
     ) {
         final Index[] concreteIndices = indexNameExpressionResolver.concreteIndices(state, request);
-        final Settings newSettings = Settings.builder()
-            .put(request.settings())
-            .normalizePrefix(IndexMetadata.INDEX_SETTING_PREFIX)
-            .build();
+        final Settings newSettings = Settings.builder().put(request.settings()).normalizePrefix(IndexMetadata.INDEX_SETTING_PREFIX).build();
 
         List<String> indicesToPromote = getIndicesRequiringPromotion(newSettings, concreteIndices, state);
 
@@ -223,7 +220,11 @@ public class TransportUpdateSettingsAction extends TransportClusterManagerNodeAc
         return indicesToPromote;
     }
 
-    private void executeSettingsUpdate(UpdateSettingsRequest request, Index[] concreteIndices, ActionListener<AcknowledgedResponse> listener) {
+    private void executeSettingsUpdate(
+        UpdateSettingsRequest request,
+        Index[] concreteIndices,
+        ActionListener<AcknowledgedResponse> listener
+    ) {
         UpdateSettingsClusterStateUpdateRequest clusterStateUpdateRequest = new UpdateSettingsClusterStateUpdateRequest().indices(
             concreteIndices
         )
@@ -246,11 +247,7 @@ public class TransportUpdateSettingsAction extends TransportClusterManagerNodeAc
         });
     }
 
-    private void promoteInferredFields(
-        Map<String, Set<String>> inferredByIndex,
-        ClusterState state,
-        ActionListener<Void> listener
-    ) {
+    private void promoteInferredFields(Map<String, Set<String>> inferredByIndex, ClusterState state, ActionListener<Void> listener) {
         List<Map.Entry<String, Set<String>>> toPromote = new ArrayList<>();
         for (Map.Entry<String, Set<String>> entry : inferredByIndex.entrySet()) {
             if (!entry.getValue().isEmpty()) {
@@ -264,10 +261,7 @@ public class TransportUpdateSettingsAction extends TransportClusterManagerNodeAc
         }
 
         GroupedActionListener<ClusterStateUpdateResponse> groupedListener = new GroupedActionListener<>(
-            ActionListener.wrap(
-                responses -> listener.onResponse(null),
-                listener::onFailure
-            ),
+            ActionListener.wrap(responses -> listener.onResponse(null), listener::onFailure),
             toPromote.size()
         );
 
@@ -283,9 +277,8 @@ public class TransportUpdateSettingsAction extends TransportClusterManagerNodeAc
                 mappingBuilder.endObject().endObject();
 
                 IndexMetadata indexMetadata = state.metadata().index(indexName);
-                PutMappingClusterStateUpdateRequest updateRequest = new PutMappingClusterStateUpdateRequest(
-                    mappingBuilder.toString()
-                ).indices(new Index[] { indexMetadata.getIndex() });
+                PutMappingClusterStateUpdateRequest updateRequest = new PutMappingClusterStateUpdateRequest(mappingBuilder.toString())
+                    .indices(new Index[] { indexMetadata.getIndex() });
 
                 logger.info("Promoting {} inferred fields to explicit mappings for index [{}]", fields.size(), indexName);
                 metadataMappingService.putMapping(updateRequest, groupedListener);

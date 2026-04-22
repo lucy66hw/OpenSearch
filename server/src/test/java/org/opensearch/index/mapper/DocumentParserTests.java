@@ -2060,10 +2060,23 @@ public class DocumentParserTests extends MapperServiceTestCase {
         FieldInfo[] infos = new FieldInfo[fieldNames.length];
         for (int i = 0; i < fieldNames.length; i++) {
             infos[i] = new FieldInfo(
-                fieldNames[i], i, false, false, false,
-                IndexOptions.DOCS, DocValuesType.NONE, -1,
-                Collections.emptyMap(), 0, 0, 0, 0,
-                VectorEncoding.FLOAT32, VectorSimilarityFunction.EUCLIDEAN, false, false
+                fieldNames[i],
+                i,
+                false,
+                false,
+                false,
+                IndexOptions.DOCS,
+                DocValuesType.NONE,
+                -1,
+                Collections.emptyMap(),
+                0,
+                0,
+                0,
+                0,
+                VectorEncoding.FLOAT32,
+                VectorSimilarityFunction.EUCLIDEAN,
+                false,
+                false
             );
         }
         return new FieldInfos(infos);
@@ -2138,9 +2151,7 @@ public class DocumentParserTests extends MapperServiceTestCase {
 
     /** Inferred mapping mode: limit check does not apply when inferred mode is disabled. */
     public void testFieldLimitNotEnforcedWhenInferredModeDisabled() throws Exception {
-        Settings normalSettings = Settings.builder()
-            .put(MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey(), 10)
-            .build();
+        Settings normalSettings = Settings.builder().put(MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey(), 10).build();
         MapperService mapperService = createMapperService(Version.CURRENT, normalSettings, mapping(b -> {}));
         mapperService.getLuceneFieldTracker().setFieldInfos(buildFieldInfos("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"));
         DocumentMapper mapper = mapperService.documentMapper();

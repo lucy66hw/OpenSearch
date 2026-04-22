@@ -24,10 +24,23 @@ public class LuceneFieldTrackerTests extends OpenSearchTestCase {
         FieldInfo[] infos = new FieldInfo[fieldNames.length];
         for (int i = 0; i < fieldNames.length; i++) {
             infos[i] = new FieldInfo(
-                fieldNames[i], i, false, false, false,
-                IndexOptions.DOCS, DocValuesType.NONE, -1,
-                Collections.emptyMap(), 0, 0, 0, 0,
-                VectorEncoding.FLOAT32, VectorSimilarityFunction.EUCLIDEAN, false, false
+                fieldNames[i],
+                i,
+                false,
+                false,
+                false,
+                IndexOptions.DOCS,
+                DocValuesType.NONE,
+                -1,
+                Collections.emptyMap(),
+                0,
+                0,
+                0,
+                0,
+                VectorEncoding.FLOAT32,
+                VectorSimilarityFunction.EUCLIDEAN,
+                false,
+                false
             );
         }
         return new FieldInfos(infos);
