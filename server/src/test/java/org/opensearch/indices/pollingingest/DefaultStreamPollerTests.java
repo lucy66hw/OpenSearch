@@ -95,7 +95,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
         partitionedBlockingQueueContainer.startProcessorThreads();
     }
@@ -169,7 +170,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
         CountDownLatch latch = new CountDownLatch(2);
         doAnswer(invocation -> {
@@ -203,7 +205,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
 
         // Set up latch to wait for 2 messages to be processed
@@ -245,7 +248,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
         CountDownLatch latch = new CountDownLatch(1);
         doAnswer(invocation -> {
@@ -283,7 +287,11 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
     public void testDropErrorIngestionStrategy() throws TimeoutException, InterruptedException {
         messages.add("{\"_id\":\"3\",\"_source\":{\"name\":\"bob\", \"age\": 24}}".getBytes(StandardCharsets.UTF_8));
         messages.add("{\"_id\":\"4\",\"_source\":{\"name\":\"alice\", \"age\": 21}}".getBytes(StandardCharsets.UTF_8));
-        FakeIngestionSource.FakeIngestionConsumer fakeConsumer = fakeConsumerFactory.createShardConsumer("", 0);
+        FakeIngestionSource.FakeIngestionConsumer fakeConsumer = fakeConsumerFactory.createShardConsumer(
+            "",
+            0,
+            new IngestionSource.Builder("FAKE").build()
+        );
         List<
             IngestionShardConsumer.ReadResult<
                 FakeIngestionSource.FakeIngestionShardPointer,
@@ -315,7 +323,7 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
         blockingQueueContainer.startProcessorThreads();
 
         IngestionConsumerFactory mockConsumerFactory = mock(IngestionConsumerFactory.class);
-        when(mockConsumerFactory.createShardConsumer(anyString(), anyInt())).thenReturn(mockConsumer);
+        when(mockConsumerFactory.createShardConsumer(anyString(), anyInt(), any())).thenReturn(mockConsumer);
 
         poller = new DefaultStreamPoller(
             new FakeIngestionSource.FakeIngestionShardPointer(0),
@@ -331,7 +339,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
         poller.start();
         Thread.sleep(sleepTime);
@@ -347,7 +356,11 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
     public void testBlockErrorIngestionStrategy() throws TimeoutException, InterruptedException {
         messages.add("{\"_id\":\"3\",\"_source\":{\"name\":\"bob\", \"age\": 24}}".getBytes(StandardCharsets.UTF_8));
         messages.add("{\"_id\":\"4\",\"_source\":{\"name\":\"alice\", \"age\": 21}}".getBytes(StandardCharsets.UTF_8));
-        FakeIngestionSource.FakeIngestionConsumer fakeConsumer = fakeConsumerFactory.createShardConsumer("", 0);
+        FakeIngestionSource.FakeIngestionConsumer fakeConsumer = fakeConsumerFactory.createShardConsumer(
+            "",
+            0,
+            new IngestionSource.Builder("FAKE").build()
+        );
         List<
             IngestionShardConsumer.ReadResult<
                 FakeIngestionSource.FakeIngestionShardPointer,
@@ -378,7 +391,7 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
         PartitionedBlockingQueueContainer blockingQueueContainer = new PartitionedBlockingQueueContainer(processorRunnable, 0);
         blockingQueueContainer.startProcessorThreads();
         IngestionConsumerFactory mockConsumerFactory = mock(IngestionConsumerFactory.class);
-        when(mockConsumerFactory.createShardConsumer(anyString(), anyInt())).thenReturn(mockConsumer);
+        when(mockConsumerFactory.createShardConsumer(anyString(), anyInt(), any())).thenReturn(mockConsumer);
 
         poller = new DefaultStreamPoller(
             new FakeIngestionSource.FakeIngestionShardPointer(0),
@@ -394,7 +407,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
         poller.start();
         Thread.sleep(sleepTime);
@@ -431,7 +445,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
         poller.start();
         Thread.sleep(sleepTime);
@@ -455,7 +470,11 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
     public void testPersistedBatchStartPointer() throws TimeoutException, InterruptedException {
         messages.add("{\"_id\":\"3\",\"_source\":{\"name\":\"bob\", \"age\": 24}}".getBytes(StandardCharsets.UTF_8));
         messages.add("{\"_id\":\"4\",\"_source\":{\"name\":\"alice\", \"age\": 21}}".getBytes(StandardCharsets.UTF_8));
-        FakeIngestionSource.FakeIngestionConsumer fakeConsumer = fakeConsumerFactory.createShardConsumer("", 0);
+        FakeIngestionSource.FakeIngestionConsumer fakeConsumer = fakeConsumerFactory.createShardConsumer(
+            "",
+            0,
+            new IngestionSource.Builder("FAKE").build()
+        );
         List<
             IngestionShardConsumer.ReadResult<
                 FakeIngestionSource.FakeIngestionShardPointer,
@@ -488,7 +507,7 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
 
         when(mockConsumer.readNext(anyLong(), anyInt())).thenReturn(readResultsBatch2).thenReturn(Collections.emptyList());
         IngestionConsumerFactory mockConsumerFactory = mock(IngestionConsumerFactory.class);
-        when(mockConsumerFactory.createShardConsumer(anyString(), anyInt())).thenReturn(mockConsumer);
+        when(mockConsumerFactory.createShardConsumer(anyString(), anyInt(), any())).thenReturn(mockConsumer);
 
         poller = new DefaultStreamPoller(
             new FakeIngestionSource.FakeIngestionShardPointer(0),
@@ -504,7 +523,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
         poller.start();
         Thread.sleep(sleepTime);
@@ -555,7 +575,7 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
 
         // Create a mock consumer factory that fails on first call but succeeds on second call
         IngestionConsumerFactory mockConsumerFactory = mock(IngestionConsumerFactory.class);
-        when(mockConsumerFactory.createShardConsumer(anyString(), anyInt())).thenThrow(
+        when(mockConsumerFactory.createShardConsumer(anyString(), anyInt(), any())).thenThrow(
             new RuntimeException("Simulated consumer initialization failure")
         ).thenReturn(mockConsumer);
 
@@ -574,7 +594,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
 
         poller.start();
@@ -585,7 +606,7 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
         }, 30, TimeUnit.SECONDS);
 
         // Verify the consumer factory was called twice (once for failure, once for success)
-        verify(mockConsumerFactory, times(2)).createShardConsumer(anyString(), anyInt());
+        verify(mockConsumerFactory, times(2)).createShardConsumer(anyString(), anyInt(), any());
         assertNotNull(poller.getConsumer());
     }
 
@@ -617,7 +638,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
 
         // Start and wait for 2 messages to be processed
@@ -666,7 +688,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
 
         // Start poller
@@ -716,7 +739,8 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             1000,
             10000,
             indexSettings,
-            new DefaultIngestionMessageMapper()
+            new DefaultIngestionMessageMapper(),
+            new IngestionSource.Builder("FAKE").build()
         );
 
         // When all queues return null and initialBatchStartPointer is null, getBatchStartPointer should return null

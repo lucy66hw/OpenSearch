@@ -53,12 +53,15 @@ public class DefaultStreamPoller implements StreamPoller {
     // flag to indicate if consumer needs to be reinitialized
     private volatile boolean reinitializeConsumer;
 
+    // the ingestion source used to create the consumer; updated on settings changes
+    private volatile IngestionSource currentIngestionSource;
+
     private volatile long lastPolledMessageTimestamp = 0;
     private volatile long cachedPointerBasedLag = 0;
     private volatile long lastPointerBasedLagUpdateTime = 0;
 
     @Nullable
-    private IngestionShardConsumer consumer;
+    private volatile IngestionShardConsumer consumer;
     private IngestionConsumerFactory consumerFactory;
     private String consumerClientId;
     private int shardId;
@@ -66,7 +69,7 @@ public class DefaultStreamPoller implements StreamPoller {
     private ExecutorService consumerThread;
 
     // start of the batch, inclusive
-    private IngestionShardPointer initialBatchStartPointer;
+    private volatile IngestionShardPointer initialBatchStartPointer;
 
     private ResetState resetState;
     private final String resetValue;
@@ -104,7 +107,8 @@ public class DefaultStreamPoller implements StreamPoller {
         int numProcessorThreads,
         int blockingQueueSize,
         long pointerBasedLagUpdateIntervalMs,
-        IngestionMessageMapper.MapperType mapperType
+        IngestionMessageMapper.MapperType mapperType,
+        IngestionSource ingestionSource
     ) {
         this(
             startPointer,
@@ -120,7 +124,8 @@ public class DefaultStreamPoller implements StreamPoller {
             pollTimeout,
             pointerBasedLagUpdateIntervalMs,
             ingestionEngine.config().getIndexSettings(),
-            IngestionMessageMapper.create(mapperType.getName(), shardId)
+            IngestionMessageMapper.create(mapperType.getName(), shardId),
+            ingestionSource
         );
     }
 
@@ -141,7 +146,8 @@ public class DefaultStreamPoller implements StreamPoller {
         int pollTimeout,
         long pointerBasedLagUpdateIntervalMs,
         IndexSettings indexSettings,
-        IngestionMessageMapper messageMapper
+        IngestionMessageMapper messageMapper,
+        IngestionSource ingestionSource
     ) {
         this.consumerFactory = Objects.requireNonNull(consumerFactory);
         this.consumerClientId = Objects.requireNonNull(consumerClientId);
@@ -160,6 +166,7 @@ public class DefaultStreamPoller implements StreamPoller {
         this.errorStrategy = errorStrategy;
         this.indexName = indexSettings.getIndex().getName();
         this.messageMapper = Objects.requireNonNull(messageMapper);
+        this.currentIngestionSource = Objects.requireNonNull(ingestionSource);
 
         // handle initial poller states
         this.paused = initialState == State.PAUSED;
@@ -462,7 +469,7 @@ public class DefaultStreamPoller implements StreamPoller {
 
     /**
      * Mark the poller's consumer for reinitialization. A new consumer will be initialized and start consuming from the
-     * latest batchStartPointer. This method also reinitializes the consumer factory with the updated ingestion source.
+     * latest batchStartPointer using the updated ingestion source.
      * @param updatedIngestionSource the updated ingestion source with new configuration parameters
      */
     @Override
@@ -472,8 +479,7 @@ public class DefaultStreamPoller implements StreamPoller {
             return;
         }
 
-        // Reinitialize the consumer factory with updated configuration
-        consumerFactory.initialize(updatedIngestionSource);
+        this.currentIngestionSource = updatedIngestionSource;
         logger.info("Configuration parameters updated for index {} shard {}, requesting consumer reinitialization", indexName, shardId);
         reinitializeConsumer = true;
     }
@@ -561,7 +567,7 @@ public class DefaultStreamPoller implements StreamPoller {
     private synchronized void initializeConsumer() {
         try {
             reinitializeConsumer = false;
-            this.consumer = consumerFactory.createShardConsumer(consumerClientId, shardId);
+            this.consumer = consumerFactory.createShardConsumer(consumerClientId, shardId, currentIngestionSource);
             logger.info("Successfully initialized consumer for shard {}", shardId);
         } catch (Exception e) {
             logger.warn("Failed to create consumer for shard {}: {}", shardId, e.getMessage());
@@ -608,6 +614,7 @@ public class DefaultStreamPoller implements StreamPoller {
         private int blockingQueueSize = 100;
         private long pointerBasedLagUpdateIntervalMs = 10000;
         private IngestionMessageMapper.MapperType mapperType = IngestionMessageMapper.MapperType.DEFAULT;
+        private IngestionSource ingestionSource;
 
         /**
          * Initialize the builder with mandatory parameters
@@ -708,6 +715,14 @@ public class DefaultStreamPoller implements StreamPoller {
         }
 
         /**
+         * Set the ingestion source used to create the consumer.
+         */
+        public Builder ingestionSource(IngestionSource ingestionSource) {
+            this.ingestionSource = Objects.requireNonNull(ingestionSource);
+            return this;
+        }
+
+        /**
          * Build the DefaultStreamPoller instance
          */
         public DefaultStreamPoller build() {
@@ -726,7 +741,8 @@ public class DefaultStreamPoller implements StreamPoller {
                 numProcessorThreads,
                 blockingQueueSize,
                 pointerBasedLagUpdateIntervalMs,
-                mapperType
+                mapperType,
+                ingestionSource
             );
         }
     }
