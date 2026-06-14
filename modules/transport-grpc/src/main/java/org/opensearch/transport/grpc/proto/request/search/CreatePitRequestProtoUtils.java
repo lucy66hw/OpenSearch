@@ -9,10 +9,10 @@
 package org.opensearch.transport.grpc.proto.request.search;
 
 import org.opensearch.action.search.CreatePitRequest;
+import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.action.search.RestCreatePitAction;
-import org.opensearch.transport.client.node.NodeClient;
 
 /**
  * Utility class for converting PIT creation protobuf requests to OpenSearch requests.
