@@ -15,7 +15,6 @@ import org.opensearch.core.common.breaker.CircuitBreaker;
 import org.opensearch.core.common.breaker.CircuitBreakingException;
 import org.opensearch.core.indices.breaker.CircuitBreakerService;
 import org.opensearch.protobufs.services.SearchServiceGrpc;
-import org.opensearch.transport.client.Client;
 import org.opensearch.transport.grpc.listeners.CreatePitRequestActionListener;
 import org.opensearch.transport.grpc.listeners.DeletePitRequestActionListener;
 import org.opensearch.transport.grpc.listeners.SearchRequestActionListener;
