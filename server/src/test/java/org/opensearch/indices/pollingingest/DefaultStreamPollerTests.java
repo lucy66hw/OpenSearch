@@ -20,6 +20,7 @@ import org.opensearch.core.rest.RestStatus;
 import org.opensearch.index.IndexSettings;
 import org.opensearch.index.IngestionConsumerFactory;
 import org.opensearch.index.IngestionShardConsumer;
+import org.opensearch.index.Message;
 import org.opensearch.index.engine.FakeIngestionSource;
 import org.opensearch.index.engine.IngestionEngine;
 import org.opensearch.indices.pollingingest.mappers.DefaultIngestionMessageMapper;
@@ -34,7 +35,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -558,7 +558,6 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             10000,
             indexSettings,
             new DefaultIngestionMessageMapper(),
-            new IngestionSource.WarmupConfig(TimeValue.timeValueMillis(-1), 0),
             new IngestionSource.Builder("FAKE").build()
         );
 
@@ -568,6 +567,19 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
         assertEquals(new FakeIngestionSource.FakeIngestionShardPointer(5), poller.getBatchStartPointer());
         blockingQueueContainer.close();
         poller.close();
+    }
+
+    private ShardUpdateMessage<FakeIngestionSource.FakeIngestionShardPointer, Message<byte[]>> createShardUpdateMessage(
+        long offset,
+        String id
+    ) {
+        byte[] payload = ("{\"_id\":\"" + id + "\",\"_source\":{\"name\":\"test\"}}").getBytes(StandardCharsets.UTF_8);
+        return new ShardUpdateMessage<>(
+            new FakeIngestionSource.FakeIngestionShardPointer(offset),
+            mock(Message.class),
+            IngestionUtils.getParsedPayloadMap(payload),
+            0
+        );
     }
 
     public void testFirstQueuedPointerIsClearedWhenQueuePutFails() throws InterruptedException {
@@ -631,7 +643,6 @@ public class DefaultStreamPollerTests extends OpenSearchTestCase {
             10000,
             indexSettings,
             new DefaultIngestionMessageMapper(),
-            new IngestionSource.WarmupConfig(TimeValue.timeValueMillis(-1), 0),
             new IngestionSource.Builder("FAKE").build()
         );
 
