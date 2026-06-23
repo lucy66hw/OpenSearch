@@ -10,7 +10,6 @@ package org.opensearch.transport.grpc.proto.response.common;
 import org.opensearch.common.Numbers;
 import org.opensearch.protobufs.FieldValue;
 import org.opensearch.protobufs.NullValue;
-import org.opensearch.protobufs.NullValue;
 
 import java.math.BigInteger;
 
@@ -55,10 +54,7 @@ public class FieldValueProtoUtils {
     public static void toProto(Object javaObject, FieldValue.Builder fieldValueBuilder) {
         if (javaObject == null) {
             fieldValueBuilder.setNullValue(NullValue.NULL_VALUE_NULL);
-            return;
-        }
-
-        if (javaObject instanceof String) {
+        } else if (javaObject instanceof String) {
             fieldValueBuilder.setString((String) javaObject);
         } else if (javaObject instanceof Integer) {
             org.opensearch.protobufs.GeneralNumber.Builder num = org.opensearch.protobufs.GeneralNumber.newBuilder();
