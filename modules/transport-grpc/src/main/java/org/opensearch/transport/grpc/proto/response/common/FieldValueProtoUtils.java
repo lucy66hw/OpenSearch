@@ -9,6 +9,8 @@ package org.opensearch.transport.grpc.proto.response.common;
 
 import org.opensearch.common.Numbers;
 import org.opensearch.protobufs.FieldValue;
+import org.opensearch.protobufs.NullValue;
+import org.opensearch.protobufs.NullValue;
 
 import java.math.BigInteger;
 
@@ -52,7 +54,8 @@ public class FieldValueProtoUtils {
      */
     public static void toProto(Object javaObject, FieldValue.Builder fieldValueBuilder) {
         if (javaObject == null) {
-            throw new IllegalArgumentException("Cannot convert null to FieldValue");
+            fieldValueBuilder.setNullValue(NullValue.NULL_VALUE_NULL);
+            return;
         }
 
         if (javaObject instanceof String) {
