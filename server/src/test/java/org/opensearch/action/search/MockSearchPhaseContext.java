@@ -191,6 +191,21 @@ public final class MockSearchPhaseContext implements SearchPhaseContext {
     }
 
     @Override
+    public void setCoordinatorQueryReduceAndFetchPlanTimeInNanos(long coordinatorQueryReduceAndFetchPlanTimeInNanos) {
+        // Noop
+    }
+
+    @Override
+    public void startCoordinatorPostFetchTime() {
+        // Noop
+    }
+
+    @Override
+    public void finishCoordinatorPostFetchTime() {
+        // Noop
+    }
+
+    @Override
     public void execute(Runnable command) {
         command.run();
     }

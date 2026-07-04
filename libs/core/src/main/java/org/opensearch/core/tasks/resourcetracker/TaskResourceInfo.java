@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Objects;
 
 import static org.opensearch.core.xcontent.ConstructingObjectParser.constructorArg;
+import static org.opensearch.core.xcontent.ConstructingObjectParser.optionalConstructorArg;
 
 /**
  * Task resource usage information with minimal information about the task
@@ -39,12 +40,18 @@ public class TaskResourceInfo implements Writeable, ToXContentObject {
     private final long taskId;
     private final long parentTaskId;
     private final String nodeId;
+    private final String phaseName;
+    private final long phaseQueueTimeInNanos;
+    private final long phaseExecutionTimeInNanos;
     private final TaskResourceUsage taskResourceUsage;
 
     private static final ParseField ACTION = new ParseField("action");
     private static final ParseField TASK_ID = new ParseField("taskId");
     private static final ParseField PARENT_TASK_ID = new ParseField("parentTaskId");
     private static final ParseField NODE_ID = new ParseField("nodeId");
+    private static final ParseField PHASE_NAME = new ParseField("phaseName");
+    private static final ParseField PHASE_QUEUE_TIME_IN_NANOS = new ParseField("phaseQueueTimeInNanos");
+    private static final ParseField PHASE_EXECUTION_TIME_IN_NANOS = new ParseField("phaseExecutionTimeInNanos");
     private static final ParseField TASK_RESOURCE_USAGE = new ParseField("taskResourceUsage");
 
     public TaskResourceInfo(
@@ -54,10 +61,26 @@ public class TaskResourceInfo implements Writeable, ToXContentObject {
         final String nodeId,
         final TaskResourceUsage taskResourceUsage
     ) {
+        this(action, taskId, parentTaskId, nodeId, null, -1L, -1L, taskResourceUsage);
+    }
+
+    public TaskResourceInfo(
+        final String action,
+        final long taskId,
+        final long parentTaskId,
+        final String nodeId,
+        final String phaseName,
+        final long phaseQueueTimeInNanos,
+        final long phaseExecutionTimeInNanos,
+        final TaskResourceUsage taskResourceUsage
+    ) {
         this.action = action;
         this.taskId = taskId;
         this.parentTaskId = parentTaskId;
         this.nodeId = nodeId;
+        this.phaseName = phaseName;
+        this.phaseQueueTimeInNanos = phaseQueueTimeInNanos;
+        this.phaseExecutionTimeInNanos = phaseExecutionTimeInNanos;
         this.taskResourceUsage = taskResourceUsage;
     }
 
@@ -67,7 +90,10 @@ public class TaskResourceInfo implements Writeable, ToXContentObject {
             .setTaskId((Long) a[1])
             .setParentTaskId((Long) a[2])
             .setNodeId((String) a[3])
-            .setTaskResourceUsage((TaskResourceUsage) a[4])
+            .setPhaseName((String) a[4])
+            .setPhaseQueueTimeInNanos((Long) a[5])
+            .setPhaseExecutionTimeInNanos((Long) a[6])
+            .setTaskResourceUsage((TaskResourceUsage) a[7])
             .build()
     );
 
@@ -76,6 +102,9 @@ public class TaskResourceInfo implements Writeable, ToXContentObject {
         PARSER.declareLong(constructorArg(), TASK_ID);
         PARSER.declareLong(constructorArg(), PARENT_TASK_ID);
         PARSER.declareString(constructorArg(), NODE_ID);
+        PARSER.declareString(optionalConstructorArg(), PHASE_NAME);
+        PARSER.declareLong(optionalConstructorArg(), PHASE_QUEUE_TIME_IN_NANOS);
+        PARSER.declareLong(optionalConstructorArg(), PHASE_EXECUTION_TIME_IN_NANOS);
         PARSER.declareObject(constructorArg(), TaskResourceUsage.PARSER, TASK_RESOURCE_USAGE);
     }
 
@@ -86,6 +115,15 @@ public class TaskResourceInfo implements Writeable, ToXContentObject {
         builder.field(TASK_ID.getPreferredName(), this.taskId);
         builder.field(PARENT_TASK_ID.getPreferredName(), this.parentTaskId);
         builder.field(NODE_ID.getPreferredName(), this.nodeId);
+        if (this.phaseName != null) {
+            builder.field(PHASE_NAME.getPreferredName(), this.phaseName);
+        }
+        if (this.phaseQueueTimeInNanos >= 0) {
+            builder.field(PHASE_QUEUE_TIME_IN_NANOS.getPreferredName(), this.phaseQueueTimeInNanos);
+        }
+        if (this.phaseExecutionTimeInNanos >= 0) {
+            builder.field(PHASE_EXECUTION_TIME_IN_NANOS.getPreferredName(), this.phaseExecutionTimeInNanos);
+        }
         builder.startObject(TASK_RESOURCE_USAGE.getPreferredName());
         this.taskResourceUsage.toXContent(builder, params);
         builder.endObject();
@@ -102,6 +140,9 @@ public class TaskResourceInfo implements Writeable, ToXContentObject {
         private long taskId;
         private long parentTaskId;
         private String nodeId;
+        private String phaseName;
+        private long phaseQueueTimeInNanos = -1L;
+        private long phaseExecutionTimeInNanos = -1L;
 
         public Builder setTaskResourceUsage(final TaskResourceUsage taskResourceUsage) {
             this.taskResourceUsage = taskResourceUsage;
@@ -128,8 +169,36 @@ public class TaskResourceInfo implements Writeable, ToXContentObject {
             return this;
         }
 
+        public Builder setPhaseName(final String phaseName) {
+            this.phaseName = phaseName;
+            return this;
+        }
+
+        public Builder setPhaseQueueTimeInNanos(final Long phaseQueueTimeInNanos) {
+            if (phaseQueueTimeInNanos != null) {
+                this.phaseQueueTimeInNanos = phaseQueueTimeInNanos;
+            }
+            return this;
+        }
+
+        public Builder setPhaseExecutionTimeInNanos(final Long phaseExecutionTimeInNanos) {
+            if (phaseExecutionTimeInNanos != null) {
+                this.phaseExecutionTimeInNanos = phaseExecutionTimeInNanos;
+            }
+            return this;
+        }
+
         public TaskResourceInfo build() {
-            return new TaskResourceInfo(action, taskId, parentTaskId, nodeId, taskResourceUsage);
+            return new TaskResourceInfo(
+                action,
+                taskId,
+                parentTaskId,
+                nodeId,
+                phaseName,
+                phaseQueueTimeInNanos,
+                phaseExecutionTimeInNanos,
+                taskResourceUsage
+            );
         }
     }
 
@@ -145,6 +214,9 @@ public class TaskResourceInfo implements Writeable, ToXContentObject {
             .setTaskId(in.readLong())
             .setParentTaskId(in.readLong())
             .setNodeId(in.readString())
+            .setPhaseName(in.readOptionalString())
+            .setPhaseQueueTimeInNanos(in.readLong())
+            .setPhaseExecutionTimeInNanos(in.readLong())
             .setTaskResourceUsage(TaskResourceUsage.readFromStream(in))
             .build();
     }
@@ -183,6 +255,18 @@ public class TaskResourceInfo implements Writeable, ToXContentObject {
         return nodeId;
     }
 
+    public String getPhaseName() {
+        return phaseName;
+    }
+
+    public long getPhaseQueueTimeInNanos() {
+        return phaseQueueTimeInNanos;
+    }
+
+    public long getPhaseExecutionTimeInNanos() {
+        return phaseExecutionTimeInNanos;
+    }
+
     /**
      * Get task action
      * @return task action
@@ -197,6 +281,9 @@ public class TaskResourceInfo implements Writeable, ToXContentObject {
         out.writeLong(taskId);
         out.writeLong(parentTaskId);
         out.writeString(nodeId);
+        out.writeOptionalString(phaseName);
+        out.writeLong(phaseQueueTimeInNanos);
+        out.writeLong(phaseExecutionTimeInNanos);
         taskResourceUsage.writeTo(out);
     }
 
@@ -215,11 +302,14 @@ public class TaskResourceInfo implements Writeable, ToXContentObject {
             && taskId == other.taskId
             && parentTaskId == other.parentTaskId
             && Objects.equals(nodeId, other.nodeId)
+            && Objects.equals(phaseName, other.phaseName)
+            && phaseQueueTimeInNanos == other.phaseQueueTimeInNanos
+            && phaseExecutionTimeInNanos == other.phaseExecutionTimeInNanos
             && taskResourceUsage.equals(other.taskResourceUsage);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(action, taskId, parentTaskId, nodeId, taskResourceUsage);
+        return Objects.hash(action, taskId, parentTaskId, nodeId, phaseName, phaseQueueTimeInNanos, phaseExecutionTimeInNanos, taskResourceUsage);
     }
 }

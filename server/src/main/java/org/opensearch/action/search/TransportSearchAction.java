@@ -443,6 +443,9 @@ public class TransportSearchAction extends HandledTransportAction<SearchRequest,
                 originalSearchRequest,
                 taskResourceTrackingService::getTaskResourceUsageFromThreadContext
             );
+            if (task instanceof SearchTask) {
+                searchRequestContext.setCoordinatorQueueTimeInNanos(Math.max(0L, relativeStartNanos - task.getStartTimeNanos()));
+            }
             searchRequestContext.getSearchRequestOperationsListener().onRequestStart(searchRequestContext);
 
             // At this point either the QUERY_GROUP_ID header will be present in ThreadContext either via ActionFilter

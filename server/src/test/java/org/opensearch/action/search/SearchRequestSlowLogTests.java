@@ -43,6 +43,8 @@ import org.opensearch.common.logging.SlowLogLevel;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
+import org.opensearch.core.tasks.resourcetracker.TaskResourceInfo;
+import org.opensearch.core.tasks.resourcetracker.TaskResourceUsage;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.test.ClusterServiceUtils;
@@ -52,9 +54,12 @@ import org.junit.BeforeClass;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Phaser;
+import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
@@ -133,9 +138,12 @@ public class SearchRequestSlowLogTests extends OpenSearchTestCase {
             new SearchRequestOperationsListener.CompositeListener(searchListenersList, logger)
         );
         when(searchRequestContext.getAbsoluteStartNanos()).thenReturn(System.nanoTime() - 1L);
+        when(searchRequestContext.phaseTookMap()).thenReturn(Collections.emptyMap());
+        when(searchRequestContext.formattedShardStats()).thenReturn("");
         when(searchPhaseContext.getRequest()).thenReturn(searchRequest);
         when(searchPhaseContext.getTask()).thenReturn(searchTask);
         when(searchRequest.searchType()).thenReturn(SearchType.QUERY_THEN_FETCH);
+        when(searchRequest.indices()).thenReturn(new String[0]);
 
         searchRequestContext.getSearchRequestOperationsListener().onRequestEnd(searchPhaseContext, searchRequestContext);
 
@@ -179,7 +187,7 @@ public class SearchRequestSlowLogTests extends OpenSearchTestCase {
             SearchRequestContext searchRequestContext = new SearchRequestContext(
                 new SearchRequestOperationsListener.CompositeListener(searchListenersList, logger),
                 searchRequest,
-                () -> null
+                Collections::emptyList
             );
             searchRequestContext.setAbsoluteStartNanos((i < numRequestsLogged) ? 0 : System.nanoTime());
             searchRequestContexts.add(searchRequestContext);
@@ -211,7 +219,7 @@ public class SearchRequestSlowLogTests extends OpenSearchTestCase {
         SearchRequestContext searchRequestContext = new SearchRequestContext(
             new SearchRequestOperationsListener.CompositeListener(List.of(), LogManager.getLogger()),
             searchRequest,
-            () -> null
+            Collections::emptyList
         );
         SearchRequestSlowLog.SearchRequestSlowLogMessage p = new SearchRequestSlowLog.SearchRequestSlowLogMessage(
             searchPhaseContext,
@@ -236,7 +244,34 @@ public class SearchRequestSlowLogTests extends OpenSearchTestCase {
         SearchRequestContext searchRequestContext = new SearchRequestContext(
             new SearchRequestOperationsListener.CompositeListener(List.of(), LogManager.getLogger()),
             searchRequest,
-            () -> null
+            Collections::emptyList
+        );
+        searchRequestContext.setCoordinatorQueueTimeInNanos(TimeUnit.MILLISECONDS.toNanos(25L));
+        searchRequestContext.setCoordinatorQueryReduceAndFetchPlanTimeInNanos(TimeUnit.MILLISECONDS.toNanos(35L));
+        searchRequestContext.setCoordinatorPostFetchTimeInNanos(TimeUnit.MILLISECONDS.toNanos(45L));
+        searchRequestContext.recordPhaseResourceUsage(
+            new TaskResourceInfo(
+                "queryAction",
+                1L,
+                0L,
+                "node_1",
+                "query",
+                TimeUnit.MILLISECONDS.toNanos(15L),
+                TimeUnit.MILLISECONDS.toNanos(50L),
+                new TaskResourceUsage(30L, 10L)
+            )
+        );
+        searchRequestContext.recordPhaseResourceUsage(
+            new TaskResourceInfo(
+                "fetchAction",
+                2L,
+                0L,
+                "node_2",
+                "fetch",
+                TimeUnit.MILLISECONDS.toNanos(20L),
+                TimeUnit.MILLISECONDS.toNanos(40L),
+                new TaskResourceUsage(35L, 10L)
+            )
         );
         searchRequestContext.updatePhaseTookMap(SearchPhaseName.FETCH.getName(), 10L);
         searchRequestContext.updatePhaseTookMap(SearchPhaseName.QUERY.getName(), 50L);
@@ -251,6 +286,14 @@ public class SearchRequestSlowLogTests extends OpenSearchTestCase {
 
         assertThat(p.getValueFor("took"), equalTo("10nanos"));
         assertThat(p.getValueFor("took_millis"), equalTo("0"));
+        assertThat(p.getValueFor("coordinator_queue_time_millis"), equalTo("25"));
+        assertThat(p.getValueFor("coordinator_execution_time_millis"), equalTo("0"));
+        assertThat(p.getValueFor("coordinator_query_reduce_and_fetch_plan_millis"), equalTo("35"));
+        assertThat(p.getValueFor("coordinator_post_fetch_time_millis"), equalTo("45"));
+        assertThat(p.getValueFor("shard_query_queue_time_millis"), equalTo("15"));
+        assertThat(p.getValueFor("shard_query_execution_time_millis"), equalTo("50"));
+        assertThat(p.getValueFor("shard_fetch_queue_time_millis"), equalTo("20"));
+        assertThat(p.getValueFor("shard_fetch_execution_time_millis"), equalTo("40"));
         assertThat(p.getValueFor("phase_took"), equalTo("{expand=5, fetch=10, query=50}"));
         assertThat(p.getValueFor("total_hits"), equalTo("3 hits"));
         assertThat(p.getValueFor("search_type"), equalTo("QUERY_THEN_FETCH"));
@@ -266,7 +309,7 @@ public class SearchRequestSlowLogTests extends OpenSearchTestCase {
         SearchRequestContext searchRequestContext = new SearchRequestContext(
             new SearchRequestOperationsListener.CompositeListener(List.of(), LogManager.getLogger()),
             searchRequest,
-            () -> null
+            Collections::emptyList
         );
         searchRequestContext.updatePhaseTookMap(SearchPhaseName.FETCH.getName(), 10L);
         searchRequestContext.updatePhaseTookMap(SearchPhaseName.QUERY.getName(), 50L);
@@ -296,7 +339,34 @@ public class SearchRequestSlowLogTests extends OpenSearchTestCase {
         SearchRequestContext searchRequestContext = new SearchRequestContext(
             new SearchRequestOperationsListener.CompositeListener(List.of(), LogManager.getLogger()),
             searchRequest,
-            () -> null
+            Collections::emptyList
+        );
+        searchRequestContext.setCoordinatorQueueTimeInNanos(TimeUnit.MILLISECONDS.toNanos(100L));
+        searchRequestContext.setCoordinatorQueryReduceAndFetchPlanTimeInNanos(TimeUnit.MILLISECONDS.toNanos(200L));
+        searchRequestContext.setCoordinatorPostFetchTimeInNanos(TimeUnit.MILLISECONDS.toNanos(300L));
+        searchRequestContext.recordPhaseResourceUsage(
+            new TaskResourceInfo(
+                "queryAction",
+                1L,
+                0L,
+                "node_1",
+                "query",
+                TimeUnit.MILLISECONDS.toNanos(15L),
+                TimeUnit.MILLISECONDS.toNanos(50L),
+                new TaskResourceUsage(30L, 10L)
+            )
+        );
+        searchRequestContext.recordPhaseResourceUsage(
+            new TaskResourceInfo(
+                "fetchAction",
+                2L,
+                0L,
+                "node_2",
+                "fetch",
+                TimeUnit.MILLISECONDS.toNanos(20L),
+                TimeUnit.MILLISECONDS.toNanos(40L),
+                new TaskResourceUsage(35L, 10L)
+            )
         );
         searchRequestContext.updatePhaseTookMap(SearchPhaseName.FETCH.getName(), 10L);
         searchRequestContext.updatePhaseTookMap(SearchPhaseName.QUERY.getName(), 50L);
@@ -311,6 +381,14 @@ public class SearchRequestSlowLogTests extends OpenSearchTestCase {
 
         assertThat(p.getFormattedMessage(), startsWith("took[100micros]"));
         assertThat(p.getFormattedMessage(), containsString("took_millis[0]"));
+        assertThat(p.getFormattedMessage(), containsString("coordinator_queue_time_millis[100]"));
+        assertThat(p.getFormattedMessage(), containsString("coordinator_execution_time_millis[0]"));
+        assertThat(p.getFormattedMessage(), containsString("coordinator_query_reduce_and_fetch_plan_millis[200]"));
+        assertThat(p.getFormattedMessage(), containsString("coordinator_post_fetch_time_millis[300]"));
+        assertThat(p.getFormattedMessage(), containsString("shard_query_queue_time_millis[15]"));
+        assertThat(p.getFormattedMessage(), containsString("shard_query_execution_time_millis[50]"));
+        assertThat(p.getFormattedMessage(), containsString("shard_fetch_queue_time_millis[20]"));
+        assertThat(p.getFormattedMessage(), containsString("shard_fetch_execution_time_millis[40]"));
         assertThat(p.getFormattedMessage(), containsString("phase_took_millis[{expand=5, fetch=10, query=50}]"));
         assertThat(p.getFormattedMessage(), containsString("total_hits[3 hits]"));
         assertThat(p.getFormattedMessage(), containsString("search_type[QUERY_THEN_FETCH]"));

@@ -155,4 +155,19 @@ public interface SearchPhaseContext extends Executor {
      * Set the resource usage info for this phase
      */
     void setPhaseResourceUsages();
+
+    /**
+     * Records the coordinator time spent reducing query results and planning the fetch phase.
+     */
+    void setCoordinatorQueryReduceAndFetchPlanTimeInNanos(long coordinatorQueryReduceAndFetchPlanTimeInNanos);
+
+    /**
+     * Marks the start of coordinator-only work that happens after shard fetch work has completed.
+     */
+    void startCoordinatorPostFetchTime();
+
+    /**
+     * Finalizes the coordinator-only work that happens after shard fetch work has completed.
+     */
+    void finishCoordinatorPostFetchTime();
 }

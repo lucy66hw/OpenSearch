@@ -157,7 +157,9 @@ public class TaskResourceTrackingServiceTests extends OpenSearchTestCase {
             new ResourceUsageMetric(CPU, 100),
             new ResourceUsageMetric(MEMORY, 100)
         );
-        taskResourceTrackingService.writeTaskResourceUsage(task, "node_1");
+        task.setShardQueryExecutionTimeInNanos(25L);
+        task.markQueryPhaseExecutionStarted(System.nanoTime());
+        taskResourceTrackingService.writeTaskResourceUsage(task, "node_1", "query");
         Map<String, List<String>> headers = threadPool.getThreadContext().getResponseHeaders();
         assertEquals(1, headers.size());
         assertTrue(headers.containsKey(TASK_RESOURCE_USAGE));
@@ -165,14 +167,20 @@ public class TaskResourceTrackingServiceTests extends OpenSearchTestCase {
 
     public void testGetTaskResourceUsageFromThreadContext() {
         String taskResourceUsageJson =
-            "{\"action\":\"testAction\",\"taskId\":1,\"parentTaskId\":2,\"nodeId\":\"nodeId\",\"taskResourceUsage\":{\"cpu_time_in_nanos\":1000,\"memory_in_bytes\":2000}}";
+            "{\"action\":\"testAction\",\"taskId\":1,\"parentTaskId\":2,\"nodeId\":\"nodeId\",\"phaseName\":\"query\","
+                + "\"phaseQueueTimeInNanos\":100,\"phaseExecutionTimeInNanos\":200,"
+                + "\"taskResourceUsage\":{\"cpu_time_in_nanos\":1000,\"memory_in_bytes\":2000}}";
         threadPool.getThreadContext().addResponseHeader(TASK_RESOURCE_USAGE, taskResourceUsageJson);
-        TaskResourceInfo result = taskResourceTrackingService.getTaskResourceUsageFromThreadContext();
-        assertNotNull(result);
+        List<TaskResourceInfo> results = taskResourceTrackingService.getTaskResourceUsageFromThreadContext();
+        assertEquals(1, results.size());
+        TaskResourceInfo result = results.get(0);
         assertEquals("testAction", result.getAction());
         assertEquals(1L, result.getTaskId());
         assertEquals(2L, result.getParentTaskId());
         assertEquals("nodeId", result.getNodeId());
+        assertEquals("query", result.getPhaseName());
+        assertEquals(100L, result.getPhaseQueueTimeInNanos());
+        assertEquals(200L, result.getPhaseExecutionTimeInNanos());
         assertEquals(1000L, result.getTaskResourceUsage().getCpuTimeInNanos());
         assertEquals(2000L, result.getTaskResourceUsage().getMemoryInBytes());
     }

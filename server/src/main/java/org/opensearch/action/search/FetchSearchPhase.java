@@ -133,6 +133,7 @@ final class FetchSearchPhase extends SearchPhase {
         final int numShards = context.getNumShards();
         final boolean isScrollSearch = context.getRequest().scroll() != null;
         final List<SearchPhaseResult> phaseResults = queryResults.asList();
+        final long coordinatorQueryReduceAndFetchPlanStartNanos = System.nanoTime();
         final SearchPhaseController.ReducedQueryPhase reducedQueryPhase = resultConsumer.reduce();
         final boolean queryAndFetchOptimization = queryResults.length() == 1;
         final Runnable finishPhase = () -> moveToNextPhase(
@@ -147,6 +148,9 @@ final class FetchSearchPhase extends SearchPhase {
                 + "], single result: "
                 + phaseResults.get(0).fetchResult();
             // query AND fetch optimization
+            context.setCoordinatorQueryReduceAndFetchPlanTimeInNanos(
+                System.nanoTime() - coordinatorQueryReduceAndFetchPlanStartNanos
+            );
             finishPhase.run();
         } else {
             ScoreDoc[] scoreDocs = reducedQueryPhase.sortedTopDocs.scoreDocs;
@@ -155,11 +159,17 @@ final class FetchSearchPhase extends SearchPhase {
             if (scoreDocs.length == 0) {
                 // we have to release contexts here to free up resources
                 phaseResults.stream().map(SearchPhaseResult::queryResult).forEach(this::releaseIrrelevantSearchContext);
+                context.setCoordinatorQueryReduceAndFetchPlanTimeInNanos(
+                    System.nanoTime() - coordinatorQueryReduceAndFetchPlanStartNanos
+                );
                 finishPhase.run();
             } else {
                 final ScoreDoc[] lastEmittedDocPerShard = isScrollSearch
                     ? searchPhaseController.getLastEmittedDocPerShard(reducedQueryPhase, numShards)
                     : null;
+                context.setCoordinatorQueryReduceAndFetchPlanTimeInNanos(
+                    System.nanoTime() - coordinatorQueryReduceAndFetchPlanStartNanos
+                );
                 final CountedCollector<FetchSearchResult> counter = new CountedCollector<>(
                     fetchResults,
                     docIdsToLoad.length, // we count down every shard in the result no matter if we got any results or not
@@ -291,6 +301,7 @@ final class FetchSearchPhase extends SearchPhase {
         SearchPhaseController.ReducedQueryPhase reducedQueryPhase,
         AtomicArray<? extends SearchPhaseResult> fetchResultsArr
     ) {
+        context.startCoordinatorPostFetchTime();
         final InternalSearchResponse internalResponse = searchPhaseController.merge(
             context.getRequest().scroll() != null,
             reducedQueryPhase,

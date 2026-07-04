@@ -14,6 +14,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.opensearch.ExceptionsHelper;
+import org.opensearch.action.search.SearchPhaseName;
 import org.opensearch.action.search.SearchShardTask;
 import org.opensearch.common.SuppressForbidden;
 import org.opensearch.common.inject.Inject;
@@ -280,7 +281,7 @@ public class TaskResourceTrackingService implements RunnableTaskExecutionListene
      * @param task {@link SearchShardTask}
      * @param nodeId the local nodeId
      */
-    public void writeTaskResourceUsage(SearchShardTask task, String nodeId) {
+    public void writeTaskResourceUsage(SearchShardTask task, String nodeId, String phaseName) {
         try {
             // Get resource usages from when the task started
             ThreadResourceInfo threadResourceInfo = task.getActiveThreadResourceInfo(
@@ -309,20 +310,32 @@ public class TaskResourceTrackingService implements RunnableTaskExecutionListene
                 return;
             }
 
+            long cpuTimeInNanos = cpu - startValues.get(ResourceStats.CPU).getStartValue();
+            long memoryInBytes = mem - startValues.get(ResourceStats.MEMORY).getStartValue();
+            long phaseQueueTimeInNanos = -1L;
+            long phaseExecutionTimeInNanos = -1L;
+
+            if (SearchPhaseName.QUERY.getName().equals(phaseName)) {
+                phaseQueueTimeInNanos = task.getShardQueryQueueTimeInNanos();
+                phaseExecutionTimeInNanos = task.getShardQueryExecutionTimeInNanos();
+            } else if (SearchPhaseName.FETCH.getName().equals(phaseName)) {
+                phaseQueueTimeInNanos = task.getShardFetchQueueTimeInNanos();
+                phaseExecutionTimeInNanos = task.getShardFetchExecutionTimeInNanos();
+            }
+
             // Build task resource usage info
             TaskResourceInfo taskResourceInfo = new TaskResourceInfo.Builder().setAction(task.getAction())
                 .setTaskId(task.getId())
                 .setParentTaskId(task.getParentTaskId().getId())
                 .setNodeId(nodeId)
+                .setPhaseName(phaseName)
+                .setPhaseQueueTimeInNanos(phaseQueueTimeInNanos)
+                .setPhaseExecutionTimeInNanos(phaseExecutionTimeInNanos)
                 .setTaskResourceUsage(
-                    new TaskResourceUsage(
-                        cpu - startValues.get(ResourceStats.CPU).getStartValue(),
-                        mem - startValues.get(ResourceStats.MEMORY).getStartValue()
-                    )
+                    new TaskResourceUsage(cpuTimeInNanos, memoryInBytes)
                 )
                 .build();
-            // Remove the existing TASK_RESOURCE_USAGE header since it would have come from an earlier phase in the same request.
-            threadPool.getThreadContext().updateResponseHeader(TASK_RESOURCE_USAGE, taskResourceInfo.toString());
+            threadPool.getThreadContext().addResponseHeader(TASK_RESOURCE_USAGE, taskResourceInfo.toString());
         } catch (Exception e) {
             logger.debug("Error during writing task resource usage: ", e);
         }
@@ -340,25 +353,28 @@ public class TaskResourceTrackingService implements RunnableTaskExecutionListene
      *
      * @return {@link TaskResourceInfo}
      */
-    public TaskResourceInfo getTaskResourceUsageFromThreadContext() {
+    public List<TaskResourceInfo> getTaskResourceUsageFromThreadContext() {
         List<String> taskResourceUsages = threadPool.getThreadContext().getResponseHeaders().get(TASK_RESOURCE_USAGE);
+        List<TaskResourceInfo> usages = new ArrayList<>();
         if (taskResourceUsages != null && taskResourceUsages.size() > 0) {
-            String usage = taskResourceUsages.get(0);
-            try {
-                if (usage != null && !usage.isEmpty()) {
+            for (String usage : taskResourceUsages) {
+                if (usage == null || usage.isEmpty()) {
+                    continue;
+                }
+                try {
                     XContentParser parser = XContentHelper.createParser(
                         NamedXContentRegistry.EMPTY,
                         DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
                         new BytesArray(usage),
                         MediaTypeRegistry.JSON
                     );
-                    return TaskResourceInfo.PARSER.apply(parser, null);
+                    usages.add(TaskResourceInfo.PARSER.apply(parser, null));
+                } catch (IOException e) {
+                    logger.debug("fail to parse phase resource usages: ", e);
                 }
-            } catch (IOException e) {
-                logger.debug("fail to parse phase resource usages: ", e);
             }
         }
-        return null;
+        return usages;
     }
 
     /**

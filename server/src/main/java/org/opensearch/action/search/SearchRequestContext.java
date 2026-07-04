@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.function.ToLongFunction;
 import java.util.function.Supplier;
 
 /**
@@ -39,15 +40,20 @@ public class SearchRequestContext {
     private TotalHits totalHits;
     private final EnumMap<ShardStatsFieldNames, Integer> shardStats;
     private Set<Index> successfulSearchShardIndices;
+    private long coordinatorQueueTimeInNanos;
+    private long coordinatorQueryReduceAndFetchPlanTimeInNanos;
+    private long coordinatorPostFetchStartNanos = -1L;
+    private long coordinatorPostFetchTimeInNanos = -1L;
 
     private final SearchRequest searchRequest;
     private final LinkedBlockingQueue<TaskResourceInfo> phaseResourceUsage;
-    private final Supplier<TaskResourceInfo> taskResourceUsageSupplier;
+    private final Supplier<List<TaskResourceInfo>> taskResourceUsageSupplier;
+    private boolean streamingRequest;
 
     SearchRequestContext(
         final SearchRequestOperationsListener searchRequestOperationsListener,
         final SearchRequest searchRequest,
-        final Supplier<TaskResourceInfo> taskResourceUsageSupplier
+        final Supplier<List<TaskResourceInfo>> taskResourceUsageSupplier
     ) {
         this.searchRequestOperationsListener = searchRequestOperationsListener;
         this.absoluteStartNanos = System.nanoTime();
@@ -127,7 +133,7 @@ public class SearchRequestContext {
         }
     }
 
-    public Supplier<TaskResourceInfo> getTaskResourceUsageSupplier() {
+    public Supplier<List<TaskResourceInfo>> getTaskResourceUsageSupplier() {
         return taskResourceUsageSupplier;
     }
 
@@ -139,6 +145,67 @@ public class SearchRequestContext {
 
     public List<TaskResourceInfo> getPhaseResourceUsage() {
         return new ArrayList<>(phaseResourceUsage);
+    }
+
+    public void setCoordinatorQueueTimeInNanos(long coordinatorQueueTimeInNanos) {
+        this.coordinatorQueueTimeInNanos = Math.max(0L, coordinatorQueueTimeInNanos);
+    }
+
+    public long getCoordinatorQueueTimeInNanos() {
+        return coordinatorQueueTimeInNanos;
+    }
+
+    public long getCoordinatorExecutionTimeInNanos(long tookInNanos) {
+        return Math.max(0L, tookInNanos - coordinatorQueueTimeInNanos);
+    }
+
+    public void setCoordinatorQueryReduceAndFetchPlanTimeInNanos(long coordinatorQueryReduceAndFetchPlanTimeInNanos) {
+        this.coordinatorQueryReduceAndFetchPlanTimeInNanos = Math.max(0L, coordinatorQueryReduceAndFetchPlanTimeInNanos);
+    }
+
+    public long getCoordinatorQueryReduceAndFetchPlanTimeInNanos() {
+        return coordinatorQueryReduceAndFetchPlanTimeInNanos;
+    }
+
+    public void startCoordinatorPostFetchTime(long coordinatorPostFetchStartNanos) {
+        this.coordinatorPostFetchStartNanos = coordinatorPostFetchStartNanos;
+    }
+
+    public void finishCoordinatorPostFetchTime(long finishTimeInNanos) {
+        if (coordinatorPostFetchStartNanos >= 0L) {
+            this.coordinatorPostFetchTimeInNanos = Math.max(0L, finishTimeInNanos - coordinatorPostFetchStartNanos);
+        }
+    }
+
+    public void setCoordinatorPostFetchTimeInNanos(long coordinatorPostFetchTimeInNanos) {
+        this.coordinatorPostFetchTimeInNanos = Math.max(0L, coordinatorPostFetchTimeInNanos);
+    }
+
+    public long getCoordinatorPostFetchTimeInNanos() {
+        return coordinatorPostFetchTimeInNanos;
+    }
+
+    public long getShardQueryQueueTimeInNanos() {
+        return sumPhaseMetric(SearchPhaseName.QUERY.getName(), TaskResourceInfo::getPhaseQueueTimeInNanos);
+    }
+
+    public long getShardQueryExecutionTimeInNanos() {
+        return sumPhaseMetric(SearchPhaseName.QUERY.getName(), TaskResourceInfo::getPhaseExecutionTimeInNanos);
+    }
+
+    public long getShardFetchQueueTimeInNanos() {
+        return sumPhaseMetric(SearchPhaseName.FETCH.getName(), TaskResourceInfo::getPhaseQueueTimeInNanos);
+    }
+
+    public long getShardFetchExecutionTimeInNanos() {
+        return sumPhaseMetric(SearchPhaseName.FETCH.getName(), TaskResourceInfo::getPhaseExecutionTimeInNanos);
+    }
+
+    private long sumPhaseMetric(String phaseName, ToLongFunction<TaskResourceInfo> metricExtractor) {
+        return phaseResourceUsage.stream()
+            .filter(usage -> phaseName.equals(usage.getPhaseName()))
+            .mapToLong(usage -> Math.max(0L, metricExtractor.applyAsLong(usage)))
+            .sum();
     }
 
     public SearchRequest getRequest() {

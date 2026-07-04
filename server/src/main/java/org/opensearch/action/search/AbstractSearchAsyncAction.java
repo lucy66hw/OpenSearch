@@ -629,8 +629,26 @@ abstract class AbstractSearchAsyncAction<Result extends SearchPhaseResult> exten
     }
 
     public void setPhaseResourceUsages() {
-        TaskResourceInfo taskResourceUsage = searchRequestContext.getTaskResourceUsageSupplier().get();
-        searchRequestContext.recordPhaseResourceUsage(taskResourceUsage);
+        List<TaskResourceInfo> taskResourceUsages = searchRequestContext.getTaskResourceUsageSupplier().get();
+        if (taskResourceUsages == null) {
+            return;
+        }
+        taskResourceUsages.forEach(searchRequestContext::recordPhaseResourceUsage);
+    }
+
+    @Override
+    public void setCoordinatorQueryReduceAndFetchPlanTimeInNanos(long coordinatorQueryReduceAndFetchPlanTimeInNanos) {
+        searchRequestContext.setCoordinatorQueryReduceAndFetchPlanTimeInNanos(coordinatorQueryReduceAndFetchPlanTimeInNanos);
+    }
+
+    @Override
+    public void startCoordinatorPostFetchTime() {
+        searchRequestContext.startCoordinatorPostFetchTime(System.nanoTime());
+    }
+
+    @Override
+    public void finishCoordinatorPostFetchTime() {
+        searchRequestContext.finishCoordinatorPostFetchTime(System.nanoTime());
     }
 
     private void onShardResultConsumed(Result result, SearchShardIterator shardIt) {
@@ -734,6 +752,7 @@ abstract class AbstractSearchAsyncAction<Result extends SearchPhaseResult> exten
 
     @Override
     public void sendSearchResponse(InternalSearchResponse internalSearchResponse, AtomicArray<SearchPhaseResult> queryResults) {
+        finishCoordinatorPostFetchTime();
         ShardSearchFailure[] failures = buildShardFailures();
         Boolean allowPartialResults = request.allowPartialSearchResults();
         assert allowPartialResults != null : "SearchRequest missing setting for allowPartialSearchResults";

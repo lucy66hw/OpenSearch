@@ -46,6 +46,7 @@ import org.opensearch.action.search.DeletePitResponse;
 import org.opensearch.action.search.ListPitInfo;
 import org.opensearch.action.search.PitSearchContextIdForNode;
 import org.opensearch.action.search.SearchShardTask;
+import org.opensearch.action.search.SearchPhaseName;
 import org.opensearch.action.search.SearchType;
 import org.opensearch.action.search.UpdatePitContextRequest;
 import org.opensearch.action.search.UpdatePitContextResponse;
@@ -646,7 +647,7 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
             processFailure(readerContext, e);
             throw e;
         } finally {
-            taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId());
+            taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId(), SearchPhaseName.DFS_QUERY.getName());
         }
     }
 
@@ -692,6 +693,7 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
                     }
                 }
                 // fork the execution in the search thread pool
+                task.markQueryPhaseEnqueued(System.nanoTime());
                 runAsync(getExecutor(shard), () -> executeQueryPhase(orig, task, keepStatesInContext), listener);
             }
 
@@ -716,6 +718,8 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
 
     private SearchPhaseResult executeQueryPhase(ShardSearchRequest request, SearchShardTask task, boolean keepStatesInContext)
         throws Exception {
+        final long queryExecutionStartNanos = System.nanoTime();
+        task.markQueryPhaseExecutionStarted(queryExecutionStartNanos);
         final ReaderContext readerContext = createOrGetReaderContext(request, keepStatesInContext);
         try (
             Releasable ignored = readerContext.markAsUsed(getKeepAlive(request));
@@ -729,6 +733,8 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
                 }
                 afterQueryTime = executor.success();
             }
+            task.setShardQueryExecutionTimeInNanos(Math.max(0L, afterQueryTime - queryExecutionStartNanos));
+            taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId(), SearchPhaseName.QUERY.getName());
             if (request.numberOfShards() == 1) {
                 return executeFetchPhase(readerContext, context, afterQueryTime);
             } else {
@@ -750,20 +756,21 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
             logger.trace("Query phase failed", exception);
             processFailure(readerContext, exception);
             throw exception;
-        } finally {
-            taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId());
         }
     }
 
     private QueryFetchSearchResult executeFetchPhase(ReaderContext reader, SearchContext context, long afterQueryTime) {
+        context.getTask().markFetchPhaseExecutionStarted(afterQueryTime);
         try (SearchOperationListenerExecutor executor = new SearchOperationListenerExecutor(context, true, afterQueryTime)) {
             shortcutDocIdsToLoad(context);
             fetchPhase.execute(context);
             if (reader.singleSession()) {
                 freeReaderContext(reader.id());
             }
-            executor.success();
+            final long afterFetchTime = executor.success();
+            context.getTask().setShardFetchExecutionTimeInNanos(Math.max(0L, afterFetchTime - afterQueryTime));
         }
+        taskResourceTrackingService.writeTaskResourceUsage(context.getTask(), clusterService.localNode().getId(), SearchPhaseName.FETCH.getName());
         return new QueryFetchSearchResult(context.queryResult(), context.fetchResult());
     }
 
@@ -781,7 +788,10 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
             freeReaderContext(readerContext.id());
             throw e;
         }
+        task.markQueryPhaseEnqueued(System.nanoTime());
         runAsync(getExecutor(readerContext.indexShard()), () -> {
+            final long queryExecutionStartNanos = System.nanoTime();
+            task.markQueryPhaseExecutionStarted(queryExecutionStartNanos);
             final ShardSearchRequest shardSearchRequest = readerContext.getShardSearchRequest(null);
             try (
                 SearchContext searchContext = createContext(readerContext, shardSearchRequest, task, false);
@@ -790,15 +800,15 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
                 searchContext.searcher().setAggregatedDfs(readerContext.getAggregatedDfs(null));
                 processScroll(request, readerContext, searchContext);
                 queryPhase.execute(searchContext);
-                executor.success();
+                final long afterQueryTime = executor.success();
+                task.setShardQueryExecutionTimeInNanos(Math.max(0L, afterQueryTime - queryExecutionStartNanos));
+                taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId(), SearchPhaseName.QUERY.getName());
                 readerContext.setRescoreDocIds(searchContext.rescoreDocIds());
                 return new ScrollQuerySearchResult(searchContext.queryResult(), searchContext.shardTarget());
             } catch (Exception e) {
                 logger.trace("Query phase failed", e);
                 // we handle the failure in the failure listener below
                 throw e;
-            } finally {
-                taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId());
             }
         }, wrapFailureListener(listener, readerContext, markAsUsed));
     }
@@ -807,7 +817,10 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
         final ReaderContext readerContext = findReaderContext(request.contextId(), request.shardSearchRequest());
         final ShardSearchRequest shardSearchRequest = readerContext.getShardSearchRequest(request.shardSearchRequest());
         final Releasable markAsUsed = readerContext.markAsUsed(getKeepAlive(shardSearchRequest));
+        task.markQueryPhaseEnqueued(System.nanoTime());
         runAsync(getExecutor(readerContext.indexShard()), () -> {
+            final long queryExecutionStartNanos = System.nanoTime();
+            task.markQueryPhaseExecutionStarted(queryExecutionStartNanos);
             readerContext.setAggregatedDfs(request.dfs());
             try (
                 SearchContext searchContext = createContext(readerContext, shardSearchRequest, task, true);
@@ -825,14 +838,14 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
                 final RescoreDocIds rescoreDocIds = searchContext.rescoreDocIds();
                 searchContext.queryResult().setRescoreDocIds(rescoreDocIds);
                 readerContext.setRescoreDocIds(rescoreDocIds);
+                task.setShardQueryExecutionTimeInNanos(Math.max(0L, System.nanoTime() - queryExecutionStartNanos));
+                taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId(), SearchPhaseName.QUERY.getName());
                 return searchContext.queryResult();
             } catch (Exception e) {
                 assert TransportActions.isShardNotAvailableException(e) == false : new AssertionError(e);
                 logger.trace("Query phase failed", e);
                 // we handle the failure in the failure listener below
                 throw e;
-            } finally {
-                taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId());
             }
         }, wrapFailureListener(listener, readerContext, markAsUsed));
     }
@@ -864,7 +877,10 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
             freeReaderContext(readerContext.id());
             throw e;
         }
+        task.markQueryPhaseEnqueued(System.nanoTime());
         runAsync(getExecutor(readerContext.indexShard()), () -> {
+            final long queryExecutionStartNanos = System.nanoTime();
+            task.markQueryPhaseExecutionStarted(queryExecutionStartNanos);
             final ShardSearchRequest shardSearchRequest = readerContext.getShardSearchRequest(null);
             try (
                 SearchContext searchContext = createContext(readerContext, shardSearchRequest, task, false);
@@ -875,6 +891,8 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
                 processScroll(request, readerContext, searchContext);
                 queryPhase.execute(searchContext);
                 final long afterQueryTime = executor.success();
+                task.setShardQueryExecutionTimeInNanos(Math.max(0L, afterQueryTime - queryExecutionStartNanos));
+                taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId(), SearchPhaseName.QUERY.getName());
                 QueryFetchSearchResult fetchSearchResult = executeFetchPhase(readerContext, searchContext, afterQueryTime);
                 return new ScrollQueryFetchSearchResult(fetchSearchResult, searchContext.shardTarget());
             } catch (Exception e) {
@@ -882,8 +900,6 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
                 logger.trace("Fetch phase failed", e);
                 // we handle the failure in the failure listener below
                 throw e;
-            } finally {
-                taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId());
             }
         }, wrapFailureListener(listener, readerContext, markAsUsed));
     }
@@ -892,7 +908,10 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
         final ReaderContext readerContext = findReaderContext(request.contextId(), request);
         final ShardSearchRequest shardSearchRequest = readerContext.getShardSearchRequest(request.getShardSearchRequest());
         final Releasable markAsUsed = readerContext.markAsUsed(getKeepAlive(shardSearchRequest));
+        task.markFetchPhaseEnqueued(System.nanoTime());
         runAsync(getExecutor(readerContext.indexShard()), () -> {
+            final long fetchExecutionStartNanos = System.nanoTime();
+            task.markFetchPhaseExecutionStarted(fetchExecutionStartNanos);
             try (SearchContext searchContext = createContext(readerContext, shardSearchRequest, task, false)) {
                 if (request.lastEmittedDoc() != null) {
                     searchContext.scrollContext().lastEmittedDoc = request.lastEmittedDoc();
@@ -907,15 +926,15 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
                     if (readerContext.singleSession()) {
                         freeReaderContext(request.contextId());
                     }
-                    executor.success();
+                    final long afterFetchTime = executor.success();
+                    task.setShardFetchExecutionTimeInNanos(Math.max(0L, afterFetchTime - fetchExecutionStartNanos));
                 }
+                taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId(), SearchPhaseName.FETCH.getName());
                 return searchContext.fetchResult();
             } catch (Exception e) {
                 assert TransportActions.isShardNotAvailableException(e) == false : new AssertionError(e);
                 // we handle the failure in the failure listener below
                 throw e;
-            } finally {
-                taskResourceTrackingService.writeTaskResourceUsage(task, clusterService.localNode().getId());
             }
         }, wrapFailureListener(listener, readerContext, markAsUsed));
     }
