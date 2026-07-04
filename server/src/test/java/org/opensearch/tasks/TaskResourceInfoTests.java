@@ -103,4 +103,22 @@ public class TaskResourceInfoTests extends OpenSearchTestCase {
         char[] xContent = BytesReference.bytes(taskResourceInfo.toXContent(builder, ToXContent.EMPTY_PARAMS)).utf8ToString().toCharArray();
         assertEquals(Arrays.hashCode(expectedXcontent), Arrays.hashCode(xContent));
     }
+
+    public void testOptionalPhaseFields() {
+        TaskResourceInfo phaseAwareTaskResourceInfo = new TaskResourceInfo(
+            action,
+            taskId,
+            parentTaskId,
+            nodeId,
+            "query",
+            10L,
+            20L,
+            taskResourceUsage
+        );
+
+        assertEquals("query", phaseAwareTaskResourceInfo.getPhaseName());
+        assertEquals(10L, phaseAwareTaskResourceInfo.getPhaseQueueTimeInNanos());
+        assertEquals(20L, phaseAwareTaskResourceInfo.getPhaseExecutionTimeInNanos());
+        assertTrue(phaseAwareTaskResourceInfo.toString().contains("\"phaseName\":\"query\""));
+    }
 }

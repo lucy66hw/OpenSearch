@@ -662,8 +662,11 @@ abstract class AbstractSearchAsyncAction<Result extends SearchPhaseResult> exten
     }
 
     public void setPhaseResourceUsages() {
-        TaskResourceInfo taskResourceUsage = searchRequestContext.getTaskResourceUsageSupplier().get();
-        searchRequestContext.recordPhaseResourceUsage(taskResourceUsage);
+        List<TaskResourceInfo> taskResourceUsages = searchRequestContext.getTaskResourceUsageSupplier().get();
+        if (taskResourceUsages == null) {
+            return;
+        }
+        taskResourceUsages.forEach(searchRequestContext::recordPhaseResourceUsage);
     }
 
     private void onShardResultConsumed(Result result, SearchShardIterator shardIt) {

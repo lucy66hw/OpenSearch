@@ -53,6 +53,12 @@ import java.util.function.Supplier;
 public class SearchShardTask extends WorkloadGroupTask implements SearchBackpressureTask {
     // generating metadata in a lazy way since source can be quite big
     private final MemoizedSupplier<String> metadataSupplier;
+    private volatile long queryPhaseEnqueuedTimeInNanos = -1L;
+    private volatile long fetchPhaseEnqueuedTimeInNanos = -1L;
+    private volatile long shardQueryQueueTimeInNanos = -1L;
+    private volatile long shardQueryExecutionTimeInNanos = -1L;
+    private volatile long shardFetchQueueTimeInNanos = -1L;
+    private volatile long shardFetchExecutionTimeInNanos = -1L;
 
     public SearchShardTask(long id, String type, String action, String description, TaskId parentTaskId, Map<String, String> headers) {
         this(id, type, action, description, parentTaskId, headers, () -> "");
@@ -73,6 +79,54 @@ public class SearchShardTask extends WorkloadGroupTask implements SearchBackpres
 
     public String getTaskMetadata() {
         return metadataSupplier.get();
+    }
+
+    public void markQueryPhaseEnqueued(long enqueuedTimeInNanos) {
+        this.queryPhaseEnqueuedTimeInNanos = enqueuedTimeInNanos;
+    }
+
+    public void markFetchPhaseEnqueued(long enqueuedTimeInNanos) {
+        this.fetchPhaseEnqueuedTimeInNanos = enqueuedTimeInNanos;
+    }
+
+    public void markQueryPhaseExecutionStarted(long startTimeInNanos) {
+        if (queryPhaseEnqueuedTimeInNanos >= 0L) {
+            this.shardQueryQueueTimeInNanos = Math.max(0L, startTimeInNanos - queryPhaseEnqueuedTimeInNanos);
+        } else {
+            this.shardQueryQueueTimeInNanos = 0L;
+        }
+    }
+
+    public void markFetchPhaseExecutionStarted(long startTimeInNanos) {
+        if (fetchPhaseEnqueuedTimeInNanos >= 0L) {
+            this.shardFetchQueueTimeInNanos = Math.max(0L, startTimeInNanos - fetchPhaseEnqueuedTimeInNanos);
+        } else {
+            this.shardFetchQueueTimeInNanos = 0L;
+        }
+    }
+
+    public long getShardQueryQueueTimeInNanos() {
+        return shardQueryQueueTimeInNanos;
+    }
+
+    public void setShardQueryExecutionTimeInNanos(long shardQueryExecutionTimeInNanos) {
+        this.shardQueryExecutionTimeInNanos = shardQueryExecutionTimeInNanos;
+    }
+
+    public long getShardQueryExecutionTimeInNanos() {
+        return shardQueryExecutionTimeInNanos;
+    }
+
+    public long getShardFetchQueueTimeInNanos() {
+        return shardFetchQueueTimeInNanos;
+    }
+
+    public void setShardFetchExecutionTimeInNanos(long shardFetchExecutionTimeInNanos) {
+        this.shardFetchExecutionTimeInNanos = shardFetchExecutionTimeInNanos;
+    }
+
+    public long getShardFetchExecutionTimeInNanos() {
+        return shardFetchExecutionTimeInNanos;
     }
 
     @Override
