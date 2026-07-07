@@ -438,11 +438,14 @@ public class TransportSearchAction extends HandledTransportAction<SearchRequest,
                 logger,
                 TraceableSearchRequestOperationsListener.create(tracer, requestSpan)
             );
+            final boolean collectTaskResourceUsage = taskResourceTrackingService.shouldSampleSearchRequest();
+            taskResourceTrackingService.setTaskResourceUsageSamplingDecision(collectTaskResourceUsage);
             SearchRequestContext searchRequestContext = new SearchRequestContext(
                 requestOperationsListeners,
                 originalSearchRequest,
                 taskResourceTrackingService::getTaskResourceUsageFromThreadContext
             );
+            searchRequestContext.setCollectTaskResourceUsage(collectTaskResourceUsage);
             if (task instanceof SearchTask) {
                 searchRequestContext.setCoordinatorQueueTimeInNanos(Math.max(0L, relativeStartNanos - task.getStartTimeNanos()));
             }

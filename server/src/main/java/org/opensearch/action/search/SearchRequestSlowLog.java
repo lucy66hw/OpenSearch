@@ -185,6 +185,7 @@ public final class SearchRequestSlowLog extends SearchRequestOperationsListener 
             long shardQueryExecutionTimeInNanos = searchRequestContext.getShardQueryExecutionTimeInNanos();
             long shardFetchQueueTimeInNanos = searchRequestContext.getShardFetchQueueTimeInNanos();
             long shardFetchExecutionTimeInNanos = searchRequestContext.getShardFetchExecutionTimeInNanos();
+            boolean taskResourceUsageSampled = searchRequestContext.isTaskResourceUsageSampled();
             messageFields.put("took", TimeValue.timeValueNanos(tookInNanos));
             messageFields.put("took_millis", TimeUnit.NANOSECONDS.toMillis(tookInNanos));
             messageFields.put("coordinator_queue_time_millis", TimeUnit.NANOSECONDS.toMillis(coordinatorQueueTimeInNanos));
@@ -198,6 +199,7 @@ public final class SearchRequestSlowLog extends SearchRequestOperationsListener 
             messageFields.put("shard_query_execution_time_millis", TimeUnit.NANOSECONDS.toMillis(shardQueryExecutionTimeInNanos));
             messageFields.put("shard_fetch_queue_time_millis", TimeUnit.NANOSECONDS.toMillis(shardFetchQueueTimeInNanos));
             messageFields.put("shard_fetch_execution_time_millis", TimeUnit.NANOSECONDS.toMillis(shardFetchExecutionTimeInNanos));
+            messageFields.put("task_resource_usage_sampled", taskResourceUsageSampled);
             messageFields.put("phase_took", searchRequestContext.phaseTookMap().toString());
             if (searchRequestContext.totalHits() != null) {
                 messageFields.put("total_hits", searchRequestContext.totalHits());
@@ -229,6 +231,7 @@ public final class SearchRequestSlowLog extends SearchRequestOperationsListener 
             long shardQueryExecutionTimeInNanos = searchRequestContext.getShardQueryExecutionTimeInNanos();
             long shardFetchQueueTimeInNanos = searchRequestContext.getShardFetchQueueTimeInNanos();
             long shardFetchExecutionTimeInNanos = searchRequestContext.getShardFetchExecutionTimeInNanos();
+            boolean taskResourceUsageSampled = searchRequestContext.isTaskResourceUsageSampled();
             sb.append("took[").append(TimeValue.timeValueNanos(tookInNanos)).append("], ");
             sb.append("took_millis[").append(TimeUnit.NANOSECONDS.toMillis(tookInNanos)).append("], ");
             sb.append("coordinator_queue_time_millis[").append(TimeUnit.NANOSECONDS.toMillis(coordinatorQueueTimeInNanos)).append("], ");
@@ -245,6 +248,7 @@ public final class SearchRequestSlowLog extends SearchRequestOperationsListener 
             sb.append("shard_query_execution_time_millis[").append(TimeUnit.NANOSECONDS.toMillis(shardQueryExecutionTimeInNanos)).append("], ");
             sb.append("shard_fetch_queue_time_millis[").append(TimeUnit.NANOSECONDS.toMillis(shardFetchQueueTimeInNanos)).append("], ");
             sb.append("shard_fetch_execution_time_millis[").append(TimeUnit.NANOSECONDS.toMillis(shardFetchExecutionTimeInNanos)).append("], ");
+            sb.append("task_resource_usage_sampled[").append(taskResourceUsageSampled).append("], ");
             sb.append("phase_took_millis[").append(searchRequestContext.phaseTookMap().toString()).append("], ");
             if (searchRequestContext.totalHits() != null) {
                 sb.append("total_hits[").append(searchRequestContext.totalHits()).append("], ");

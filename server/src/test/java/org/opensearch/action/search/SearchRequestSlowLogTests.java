@@ -229,6 +229,7 @@ public class SearchRequestSlowLogTests extends OpenSearchTestCase {
 
         assertThat(p.getValueFor("took"), equalTo("10nanos"));
         assertThat(p.getValueFor("took_millis"), equalTo("0"));
+        assertThat(p.getValueFor("task_resource_usage_sampled"), equalTo("true"));
         assertThat(p.getValueFor("phase_took"), equalTo("{}"));
         assertThat(p.getValueFor("total_hits"), equalTo("-1"));
         assertThat(p.getValueFor("search_type"), equalTo("QUERY_THEN_FETCH"));
@@ -294,6 +295,7 @@ public class SearchRequestSlowLogTests extends OpenSearchTestCase {
         assertThat(p.getValueFor("shard_query_execution_time_millis"), equalTo("50"));
         assertThat(p.getValueFor("shard_fetch_queue_time_millis"), equalTo("20"));
         assertThat(p.getValueFor("shard_fetch_execution_time_millis"), equalTo("40"));
+        assertThat(p.getValueFor("task_resource_usage_sampled"), equalTo("true"));
         assertThat(p.getValueFor("phase_took"), equalTo("{expand=5, fetch=10, query=50}"));
         assertThat(p.getValueFor("total_hits"), equalTo("3 hits"));
         assertThat(p.getValueFor("search_type"), equalTo("QUERY_THEN_FETCH"));
@@ -324,12 +326,36 @@ public class SearchRequestSlowLogTests extends OpenSearchTestCase {
 
         assertThat(p.getValueFor("took"), equalTo("10s"));
         assertThat(p.getValueFor("took_millis"), equalTo("10000"));
+        assertThat(p.getValueFor("task_resource_usage_sampled"), equalTo("true"));
         assertThat(p.getValueFor("phase_took"), equalTo("{expand=5, fetch=10, query=50}"));
         assertThat(p.getValueFor("total_hits"), equalTo("3 hits"));
         assertThat(p.getValueFor("search_type"), equalTo("QUERY_THEN_FETCH"));
         assertThat(p.getValueFor("shards"), equalTo("{total:5, successful:3, skipped:1, failed:1}"));
         assertThat(p.getValueFor("source"), equalTo("{\\\"query\\\":{\\\"match_all\\\":{\\\"boost\\\":1.0}}}"));
         assertThat(p.getValueFor("id"), equalTo(null));
+    }
+
+    public void testSearchRequestSlowLogMarksUnsampledTaskResourceUsage() throws IOException {
+        SearchSourceBuilder source = SearchSourceBuilder.searchSource().query(QueryBuilders.matchAllQuery());
+        SearchRequest searchRequest = new SearchRequest().source(source);
+        SearchPhaseContext searchPhaseContext = new MockSearchPhaseContext(1, searchRequest);
+        SearchRequestContext searchRequestContext = new SearchRequestContext(
+            new SearchRequestOperationsListener.CompositeListener(List.of(), LogManager.getLogger()),
+            searchRequest,
+            Collections::emptyList
+        );
+        searchRequestContext.setCollectTaskResourceUsage(false);
+        SearchRequestSlowLog.SearchRequestSlowLogMessage p = new SearchRequestSlowLog.SearchRequestSlowLogMessage(
+            searchPhaseContext,
+            10,
+            searchRequestContext
+        );
+
+        assertThat(p.getValueFor("task_resource_usage_sampled"), equalTo("false"));
+        assertThat(p.getValueFor("shard_query_queue_time_millis"), equalTo("0"));
+        assertThat(p.getValueFor("shard_query_execution_time_millis"), equalTo("0"));
+        assertThat(p.getValueFor("shard_fetch_queue_time_millis"), equalTo("0"));
+        assertThat(p.getValueFor("shard_fetch_execution_time_millis"), equalTo("0"));
     }
 
     public void testSearchRequestSlowLogSearchContextPrinterToLog() throws IOException {

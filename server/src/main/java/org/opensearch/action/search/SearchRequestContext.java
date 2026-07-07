@@ -48,6 +48,7 @@ public class SearchRequestContext {
     private final SearchRequest searchRequest;
     private final LinkedBlockingQueue<TaskResourceInfo> phaseResourceUsage;
     private final Supplier<List<TaskResourceInfo>> taskResourceUsageSupplier;
+    private boolean collectTaskResourceUsage = true;
     private boolean streamingRequest;
 
     SearchRequestContext(
@@ -135,6 +136,18 @@ public class SearchRequestContext {
 
     public Supplier<List<TaskResourceInfo>> getTaskResourceUsageSupplier() {
         return taskResourceUsageSupplier;
+    }
+
+    public void setCollectTaskResourceUsage(boolean collectTaskResourceUsage) {
+        this.collectTaskResourceUsage = collectTaskResourceUsage;
+    }
+
+    public boolean shouldCollectTaskResourceUsage() {
+        return collectTaskResourceUsage;
+    }
+
+    public boolean isTaskResourceUsageSampled() {
+        return collectTaskResourceUsage;
     }
 
     public void recordPhaseResourceUsage(TaskResourceInfo usage) {

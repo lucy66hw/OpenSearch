@@ -36,6 +36,7 @@ import static org.opensearch.core.tasks.resourcetracker.ResourceStats.CPU;
 import static org.opensearch.core.tasks.resourcetracker.ResourceStats.MEMORY;
 import static org.opensearch.tasks.TaskResourceTrackingService.TASK_ID;
 import static org.opensearch.tasks.TaskResourceTrackingService.TASK_RESOURCE_USAGE;
+import static org.opensearch.tasks.TaskResourceTrackingService.TASK_RESOURCE_USAGE_SAMPLED;
 
 public class TaskResourceTrackingServiceTests extends OpenSearchTestCase {
 
@@ -163,6 +164,43 @@ public class TaskResourceTrackingServiceTests extends OpenSearchTestCase {
         Map<String, List<String>> headers = threadPool.getThreadContext().getResponseHeaders();
         assertEquals(1, headers.size());
         assertTrue(headers.containsKey(TASK_RESOURCE_USAGE));
+    }
+
+    public void testWriteTaskResourceUsageSkipsUnsampledRequests() {
+        Map<String, String> headers = new HashMap<>();
+        headers.put(TASK_RESOURCE_USAGE_SAMPLED, Boolean.FALSE.toString());
+        SearchShardTask task = new SearchShardTask(1, "test", "test", "task", TaskId.EMPTY_TASK_ID, headers);
+        taskResourceTrackingService.setTaskResourceTrackingEnabled(true);
+        taskResourceTrackingService.startTracking(task);
+        task.startThreadResourceTracking(
+            Thread.currentThread().getId(),
+            ResourceStatsType.WORKER_STATS,
+            new ResourceUsageMetric(CPU, 100),
+            new ResourceUsageMetric(MEMORY, 100)
+        );
+        task.setShardQueryExecutionTimeInNanos(25L);
+        task.markQueryPhaseExecutionStarted(System.nanoTime());
+        taskResourceTrackingService.writeTaskResourceUsage(task, "node_1", "query");
+
+        assertNull(threadPool.getThreadContext().getResponseHeaders().get(TASK_RESOURCE_USAGE));
+    }
+
+    public void testShouldSampleSearchRequestRespectsFastPathRates() {
+        assumeTrue("task resource tracking is unsupported", taskResourceTrackingService.isTaskResourceTrackingSupported());
+
+        TaskResourceTrackingService disabledSamplingService = new TaskResourceTrackingService(
+            Settings.builder().put(TaskResourceTrackingService.SEARCH_REQUEST_RESOURCE_USAGE_SAMPLING_RATE.getKey(), 0.0d).build(),
+            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            threadPool
+        );
+        assertFalse(disabledSamplingService.shouldSampleSearchRequest());
+
+        TaskResourceTrackingService alwaysSamplingService = new TaskResourceTrackingService(
+            Settings.builder().put(TaskResourceTrackingService.SEARCH_REQUEST_RESOURCE_USAGE_SAMPLING_RATE.getKey(), 1.0d).build(),
+            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            threadPool
+        );
+        assertTrue(alwaysSamplingService.shouldSampleSearchRequest());
     }
 
     public void testGetTaskResourceUsageFromThreadContext() {

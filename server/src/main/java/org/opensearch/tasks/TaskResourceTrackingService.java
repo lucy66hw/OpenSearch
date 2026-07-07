@@ -46,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static org.opensearch.core.tasks.resourcetracker.ResourceStatsType.WORKER_STATS;
 
@@ -63,8 +64,17 @@ public class TaskResourceTrackingService implements RunnableTaskExecutionListene
         Setting.Property.Dynamic,
         Setting.Property.NodeScope
     );
+    public static final Setting<Double> SEARCH_REQUEST_RESOURCE_USAGE_SAMPLING_RATE = Setting.doubleSetting(
+        "task_resource_tracking.search_request_resource_usage_sampling_rate",
+        1.0d,
+        0.0d,
+        1.0d,
+        Setting.Property.Dynamic,
+        Setting.Property.NodeScope
+    );
     public static final String TASK_ID = "TASK_ID";
     public static final String TASK_RESOURCE_USAGE = "TASK_RESOURCE_USAGE";
+    public static final String TASK_RESOURCE_USAGE_SAMPLED = "TASK_RESOURCE_USAGE_SAMPLED";
 
     private static final ThreadMXBean threadMXBean = (ThreadMXBean) ManagementFactory.getThreadMXBean();
 
@@ -72,20 +82,47 @@ public class TaskResourceTrackingService implements RunnableTaskExecutionListene
     private final List<TaskCompletionListener> taskCompletionListeners = new ArrayList<>();
     private final ThreadPool threadPool;
     private volatile boolean taskResourceTrackingEnabled;
+    private volatile double searchRequestResourceUsageSamplingRate;
 
     @Inject
     public TaskResourceTrackingService(Settings settings, ClusterSettings clusterSettings, ThreadPool threadPool) {
         this.taskResourceTrackingEnabled = TASK_RESOURCE_TRACKING_ENABLED.get(settings);
+        this.searchRequestResourceUsageSamplingRate = SEARCH_REQUEST_RESOURCE_USAGE_SAMPLING_RATE.get(settings);
         this.threadPool = threadPool;
         clusterSettings.addSettingsUpdateConsumer(TASK_RESOURCE_TRACKING_ENABLED, this::setTaskResourceTrackingEnabled);
+        clusterSettings.addSettingsUpdateConsumer(
+            SEARCH_REQUEST_RESOURCE_USAGE_SAMPLING_RATE,
+            this::setSearchRequestResourceUsageSamplingRate
+        );
     }
 
     public void setTaskResourceTrackingEnabled(boolean taskResourceTrackingEnabled) {
         this.taskResourceTrackingEnabled = taskResourceTrackingEnabled;
     }
 
+    public void setSearchRequestResourceUsageSamplingRate(double searchRequestResourceUsageSamplingRate) {
+        this.searchRequestResourceUsageSamplingRate = searchRequestResourceUsageSamplingRate;
+    }
+
     public boolean isTaskResourceTrackingEnabled() {
         return taskResourceTrackingEnabled;
+    }
+
+    public boolean shouldSampleSearchRequest() {
+        if (isTaskResourceTrackingEnabled() == false || isTaskResourceTrackingSupported() == false) {
+            return false;
+        }
+        if (searchRequestResourceUsageSamplingRate <= 0.0d) {
+            return false;
+        }
+        if (searchRequestResourceUsageSamplingRate >= 1.0d) {
+            return true;
+        }
+        return ThreadLocalRandom.current().nextDouble() < searchRequestResourceUsageSamplingRate;
+    }
+
+    public void setTaskResourceUsageSamplingDecision(boolean sampled) {
+        threadPool.getThreadContext().putHeader(TASK_RESOURCE_USAGE_SAMPLED, Boolean.toString(sampled));
     }
 
     public boolean isTaskResourceTrackingSupported() {
@@ -282,6 +319,9 @@ public class TaskResourceTrackingService implements RunnableTaskExecutionListene
      * @param nodeId the local nodeId
      */
     public void writeTaskResourceUsage(SearchShardTask task, String nodeId, String phaseName) {
+        if (shouldTrackTaskResourceUsage(task) == false) {
+            return;
+        }
         try {
             // Get resource usages from when the task started
             ThreadResourceInfo threadResourceInfo = task.getActiveThreadResourceInfo(
@@ -339,6 +379,14 @@ public class TaskResourceTrackingService implements RunnableTaskExecutionListene
         } catch (Exception e) {
             logger.debug("Error during writing task resource usage: ", e);
         }
+    }
+
+    private boolean shouldTrackTaskResourceUsage(SearchShardTask task) {
+        if (isTaskResourceTrackingEnabled() == false || isTaskResourceTrackingSupported() == false) {
+            return false;
+        }
+        final String sampledHeader = task.getHeader(TASK_RESOURCE_USAGE_SAMPLED);
+        return sampledHeader == null || Boolean.parseBoolean(sampledHeader);
     }
 
     /**
